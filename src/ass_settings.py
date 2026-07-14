@@ -119,7 +119,7 @@ class AssStyle:
             return self.lan_code["UNKNOWNCC"]
 
     def color2hex(self, str_color: str) -> str:
-        return webcolors.name_to_hex(str_color)
+        return webcolors.name_to_hex(str_color).lstrip('#') # it can get rid of '#' in front of the hex code
 
     def update_title(self, title: str) -> None:
         """Update title value in the Script Info block
