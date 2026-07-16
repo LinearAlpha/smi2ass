@@ -31,6 +31,15 @@ $ smi2ass my_bad_subtitles.smi
 Failed to extract time code: <sync star=1234>
 ```
 
+## Testing
+
+Install the runtime dependencies and run the test suite:
+
+```shell
+python -m pip install beautifulsoup4 chardet webcolors
+python -m unittest discover -s src/test -v
+```
+
 ## Credits
 
 The conversion script was initially forked from [service.subtitles.gomtv](https://github.com/hojel/service.subtitles.gomtv/tree/3a7342961e140eaf8250659b0ac6158ce5e6bc5c/resources/lib) and [smi2ass](https://github.com/trustin/smi2ass/tree/v0.1.1)
