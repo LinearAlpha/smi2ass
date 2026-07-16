@@ -9,7 +9,7 @@ classifiers = [
     "Programming Language :: Python",
 ]
 
-dependencies = ["beautifulsoup4", "chardet"]
+dependencies = ["beautifulsoup4", "charset-normalizer"]
 
 readme = "README.md"
 license = { file = "LICENSE" }

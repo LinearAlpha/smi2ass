@@ -36,7 +36,7 @@ Failed to extract time code: <sync star=1234>
 Install the runtime dependencies and run the test suite:
 
 ```shell
-python -m pip install beautifulsoup4 chardet webcolors
+python -m pip install beautifulsoup4 charset-normalizer webcolors
 python -m unittest discover -s src/test -v
 ```
 
