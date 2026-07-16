@@ -41,3 +41,6 @@ Since then, [@LinearAlpha](https://github.com/LinearAlpha) made the following ch
 - Updated Python from 3.6.X to 3.8.X
 - Convert ASS setting into JSON file so user can easily modify if it needed
 - Added a class called "AssStyle" so user can update font name, font size, title, and video resolution from the command line or simply calling setter method
+
+Additional contributions:
+- [@najoan125](https://github.com/najoan125) fixed named color conversion in `<font>` tags by removing the leading `#` before RGB-to-BGR conversion ([#1](https://github.com/LinearAlpha/smi2ass/pull/1)).
