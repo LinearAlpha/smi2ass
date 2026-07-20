@@ -7,7 +7,7 @@ from pathlib import Path
 import html
 
 # PIP installed modules
-import chardet
+import charset_normalizer as chardet
 from bs4 import BeautifulSoup as bs
 from bs4 import ResultSet
 

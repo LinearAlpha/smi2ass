@@ -1,5 +1,5 @@
 beautifulsoup4
-chardet
+charset-normalizer
 webcolors
 # To build project
 setuptools
