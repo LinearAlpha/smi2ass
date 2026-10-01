@@ -1,46 +1,35 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "smi2ass"
-version = "1.2.5"
-description = "A simple smi2ass converter"
-requires-python = ">3.7"
-
+version = "1.5"
+description = "A command-line SAMI to SSA/ASS subtitle converter"
+requires-python = ">=3.11"
+readme = "README.md"
+license-files = ["LICENSE.txt"]
+dependencies = ["beautifulsoup4", "charset-normalizer", "webcolors"]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
-dependencies = ["beautifulsoup4", "charset-normalizer"]
+[project.urls]
+Repository = "https://github.com/LinearAlpha/smi2ass"
+Releases = "https://github.com/LinearAlpha/smi2ass/releases"
 
-readme = "README.md"
-license = { file = "LICENSE" }
+[project.scripts]
+smi2ass = "smi2ass.__main__:main"
 
-[project.optional-dependencies]
-dev_win = ["nuitka"]
-dev_linux = ["nuitka", "patchelf"]
+[tool.setuptools]
+include-package-data = false
+packages = ["smi2ass"]
+package-dir = { smi2ass = "src" }
 
-[build-system]
-requires = ["setuptools>=42", "wheel", "nuitka", "toml"]
-build-backend = "nuitka.distutils.Build"
-
-[tool.nuitka]
-# These are not recommended, but they make it obvious to have effect.
-
-# boolean option, e.g. if you cared for C compilation commands, leading
-# dashes are omitted
-show-scons = true
-
-# options with single values, e.g. enable a plugin of Nuitka
-plugin-enable = ["pyside2"] # Add plugins if needed
-
-# options with several values, e.g. avoiding including modules, accepts
-# list argument.
-nofollow-import-to = ["*.tests", "*.distutils"]
-
-standalone = true # Generate a standalone executable
-onefile = false   # Generate a single-file executable
-
-[tool.scripts]
-smi2ass = "src.__main__:main"
-
-[tool.package]
-include = ["src"]
+[tool.setuptools.package-data]
+smi2ass = ["setting/*.json", "setting/*.txt"]

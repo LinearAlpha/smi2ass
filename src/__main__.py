@@ -3,7 +3,12 @@ import argparse
 from pathlib import Path
 
 # Custom made modules
-from smi2ass import smi2ass
+if __package__:
+    from . import __version__
+    from .smi2ass import smi2ass
+else:
+    from smi2ass import smi2ass
+    __version__ = "1.5"
 
 
 def cmd_arg() -> argparse.ArgumentParser:
@@ -11,6 +16,9 @@ def cmd_arg() -> argparse.ArgumentParser:
         prog="smi2ass",
         description="Converting SAMI (SMI) into Advanced SubStation Alpha (ASS) subtitle",
     )
+
+    parser.add_argument("--version", action="version", version=f"smi2ass {__version__}")
+    parser.add_argument("--settings-dir", default="", help="Directory containing custom settings JSON files")
 
     parser.add_argument(
         "file_name",
@@ -122,7 +130,7 @@ def main() -> None:
     parser: argparse.ArgumentParser = cmd_arg()
     args: argparse.Namespace = parser.parse_args()
 
-    obj_smi2ass = smi2ass()  # Create object for smi2ass
+    obj_smi2ass = smi2ass(setting_path=args.settings_dir)
     update_style(obj_smi2ass, args)
 
     # Check if user gave time offset

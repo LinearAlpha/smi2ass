@@ -1,19 +1,17 @@
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from ass_settings import AssStyle
+from smi2ass import AssStyle
 from smi2ass import rgb2bgr, smi2ass
 
 
 class ColorConversionTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.setting_path = str(PROJECT_ROOT / "setting")
+        self.setting_path = str(PROJECT_ROOT / "src" / "setting")
 
     def test_color_name_is_converted_to_six_digit_hex(self) -> None:
         style = AssStyle(setting_path=self.setting_path)

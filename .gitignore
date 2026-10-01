@@ -9,3 +9,9 @@ __pycache__
 # Temperate ignore
 *.ps1
 *.sh
+
+/dist
+/release-assets
+.build-venv
+.wheel-venv
+.sdist-venv
