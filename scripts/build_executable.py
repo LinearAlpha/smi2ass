@@ -16,6 +16,7 @@ def main() -> None:
         sys.executable, "-m", "nuitka", "--standalone", "--onefile",
         "--assume-yes-for-downloads", "--remove-output", "--jobs=2",
         "--include-package=smi2ass", "--include-package-data=smi2ass",
+        "--nofollow-import-to=smi2ass.test",
         f"--output-dir={output}", f"--output-filename={name}",
         str(ROOT / "scripts" / "standalone.py"),
     ], check=True, cwd=ROOT)

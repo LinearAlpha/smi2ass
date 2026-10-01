@@ -27,6 +27,7 @@ Releases = "https://github.com/LinearAlpha/smi2ass/releases"
 smi2ass = "smi2ass.__main__:main"
 
 [tool.setuptools]
+include-package-data = false
 packages = ["smi2ass"]
 package-dir = { smi2ass = "src" }
 
