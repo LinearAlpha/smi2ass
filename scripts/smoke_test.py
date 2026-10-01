@@ -1,5 +1,7 @@
 """Exercise an installed CLI or extracted executable outside the checkout."""
 import argparse
+import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -52,6 +54,24 @@ def main() -> None:
         assert files == ["bilingual-ENG.ass", "bilingual-KOR.ass"], files
         for path in (root / "translated").glob("*.ass"):
             assert "0:00:00.50,0:00:01.50" in path.read_text(encoding="utf-8")
+        # Verify explicit settings overrides and editable settings beside binaries.
+        custom = root / "custom-settings"
+        shutil.copytree(Path(__file__).resolve().parents[1] / "src" / "setting", custom)
+        styles = json.loads((custom / "ass_styles.json").read_text(encoding="utf-8"))
+        styles["style"]["Fontname"] = "Custom Test Font"
+        (custom / "ass_styles.json").write_text(json.dumps(styles), encoding="utf-8")
+        run("--settings-dir", str(custom), "-o", "custom-output", str(english))
+        assert "Custom Test Font" in (root / "custom-output" / "English sample.ass").read_text(encoding="utf-8")
+        if args.executable:
+            external = Path(args.executable).resolve().parent / "setting" / "ass_styles.json"
+            if external.exists():
+                original = external.read_bytes()
+                try:
+                    external.write_text(json.dumps(styles), encoding="utf-8")
+                    run("-o", "external-output", str(english))
+                    assert "Custom Test Font" in (root / "external-output" / "English sample.ass").read_text(encoding="utf-8")
+                finally:
+                    external.write_bytes(original)
         # Reusing one converter across files must not carry languages forward.
         run("-o", "batch", str(bilingual), str(english))
         assert (root / "batch" / "English sample.ass").is_file()
