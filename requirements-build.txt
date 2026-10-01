@@ -1,0 +1,7 @@
+build
+twine
+nuitka
+ordered-set
+zstandard
+patchelf; sys_platform == 'linux'
+py7zr

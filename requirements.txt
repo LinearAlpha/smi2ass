@@ -1,7 +1,2 @@
-beautifulsoup4
-charset-normalizer
-webcolors
-# To build project
-setuptools
-nuitka
-patchelf; os.name != 'nt' 
+# Install runtime dependencies from the authoritative project metadata.
+.

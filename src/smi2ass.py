@@ -7,12 +7,15 @@ from pathlib import Path
 import html
 
 # PIP installed modules
-import charset_normalizer as chardet
+import charset_normalizer
 from bs4 import BeautifulSoup as bs
 from bs4 import ResultSet
 
 # Custom modules
-from ass_settings import AssStyle
+if __package__:
+    from .ass_settings import AssStyle
+else:  # Retain direct source execution.
+    from ass_settings import AssStyle
 
 
 class smi2ass(AssStyle):
@@ -62,6 +65,9 @@ class smi2ass(AssStyle):
         """
 
         self.path2smi = Path(smi_file_input)  # Saving input path
+        self.flag_preprocess = False
+        self.smi_lines.clear()
+        self.ass_lines.clear()
 
         # Printing which file is currently converting
         print(f"\nConverting... \n{self.path2smi}")
@@ -70,7 +76,7 @@ class smi2ass(AssStyle):
         try:
             # Identify encoding of the file
             with open(smi_file_input, "rb") as f:
-                f_encoding: str | None = chardet.detect(f.read())["encoding"]
+                f_encoding: str | None = charset_normalizer.detect(f.read())["encoding"]
             # Reading SMI file
             with open(
                 smi_file_input, "r", encoding=f_encoding, errors="replace"
@@ -451,34 +457,14 @@ class smi2ass(AssStyle):
             path2save (str | Path, optional): Input path. Defaults to "".
         """
 
-        ass_path: Path  # Preparing value to hole output path
-
-        if type(path2save) == str:
-            if path2save == "":
-                ass_path = self.path2smi.parents[0]
-            else:
-                ass_path = Path(path2save)
-                ass_path.mkdir(parents=True, exist_ok=True)
-        else:
-            ass_path = path2save  # type: ignore
-            ass_path.mkdir(parents=True, exist_ok=True)
-
-        # If there is more then one language, on the file name, it will add
-        # what language is in converted  ass file.
-        # e.g test-kor.ass and test-jp.ass
-        lang_keys: list[str] = list(self.ass_lines.keys())
-        if len(lang_keys) == 1:
-            ass_path = ass_path.joinpath(f"{self.path2smi.stem}.ass")
-            save_internal(ass_path, self.ass_lines[lang_keys[0]])
-        else:
-            for tmp_key in lang_keys:
-                ass_path = ass_path.joinpath(
-                    f"{self.path2smi.stem}-{tmp_key.upper()}.ass"
-                )
-                save_internal(ass_path, self.ass_lines[tmp_key])
-
-        # Added message to notify where file has been saved
-        print(f"Converted file has been saved as... \n{ass_path}")
+        output_dir = self.path2smi.parent if path2save == "" else Path(path2save)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        multiple_languages = len(self.ass_lines) > 1
+        for language, lines in self.ass_lines.items():
+            suffix = f"-{language.upper()}" if multiple_languages else ""
+            ass_path = output_dir / f"{self.path2smi.stem}{suffix}.ass"
+            save_internal(ass_path, lines)
+            print(f"Converted file has been saved as... {ass_path}")
 
 
 def rgb2bgr(rgb: str) -> str:

@@ -16,18 +16,17 @@ class AssStyle:
 
         Args:
             setting_path (str, optional): Path to where JSON files are located.
-            Defaults to './setting/'.
+            Defaults to packaged settings, or settings beside the executable.
         """
 
         # Save input path
         self.setting_path: Path
         if setting_path == "":
-            # Get executable root directory, in case when compiled else just
-            # get project directory
-            base_dir: Path = (
-                Path(sys.argv[0]).parent if is_nuitka() else Path.cwd()
-            )
-            self.setting_path = base_dir.joinpath("setting")
+            self.setting_path = Path(__file__).resolve().parent / "setting"
+            if is_nuitka():
+                external = Path(sys.argv[0]).resolve().parent / "setting"
+                if external.is_dir():
+                    self.setting_path = external
         else:
             self.setting_path = Path(setting_path)
 
@@ -200,13 +199,8 @@ def load_setting(fs_name: str, fs_path: Path | str) -> dict[str, any]:
         dict[str, any]: Parsed JSON data from file
     """
 
-    # Setting full path of JSON file to open
-    if isinstance(fs_path, Path):
-        file2open: Path | str = fs_path.joinpath(fs_name)  # type: ignore
-    else:
-        file2open: Path | str = fs_path + fs_name  # type: ignore
-
-    with open(file2open, "r") as f:
+    file2open = Path(fs_path) / fs_name
+    with open(file2open, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
