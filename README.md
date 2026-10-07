@@ -4,7 +4,7 @@
 
 ## Download or install
 
-[Download V1.5](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5) for **Windows x86-64** or **Linux x86-64**. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. Linux binaries are built on Ubuntu 22.04 and require glibc 2.35 or newer.
+[Download V1.5](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5) for **Windows x86-64** or **Linux x86-64**. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. V1.5 Linux binaries are built on Ubuntu 22.04 and require glibc 2.35 or newer.
 
 The release includes `SHA256SUMS.txt` for verifying downloads. Each executable archive includes `BUILD-INFO.json` identifying the source commit and build dependencies.
 
@@ -120,7 +120,7 @@ python -m unittest discover -s src/test -v
 python scripts/smoke_test.py
 ```
 
-CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Linux**. It also builds and tests wheel/source installations in fresh environments, compiles Linux/Windows executables with Python 3.14, and tests both extracted archive formats outside the checkout.
+CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Ubuntu 26.04**. It also builds and tests wheel/source installations in fresh environments, compiles Linux/Windows executables with Python 3.14 (Linux builds use Ubuntu 26.04), and tests both extracted archive formats outside the checkout.
 
 ## Build distributions
 
