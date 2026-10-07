@@ -120,7 +120,7 @@ python -m unittest discover -s src/test -v
 python scripts/smoke_test.py
 ```
 
-CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Linux**. It also builds and tests wheel/source installations in fresh environments, compiles Linux/Windows executables with Python 3.12, and tests both extracted archive formats outside the checkout.
+CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Linux**. It also builds and tests wheel/source installations in fresh environments, compiles Linux/Windows executables with Python 3.14, and tests both extracted archive formats outside the checkout.
 
 ## Build distributions
 
