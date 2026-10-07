@@ -21,13 +21,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable")
     args = parser.parse_args()
-    command = [str(Path(args.executable).resolve())] if args.executable else [sys.executable, "-m", "smi2ass"]
+    command = [str(Path(args.executable).resolve())] if args.executable else [sys.executable, "-I", "-m", "smi2ass"]
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
 
         def run(*arguments):
-            return subprocess.run(command + list(arguments), cwd=root, check=True,
-                                  text=True, encoding="utf-8", capture_output=True)
+            try:
+                return subprocess.run(command + list(arguments), cwd=root, check=True,
+                                      text=True, encoding="utf-8", capture_output=True)
+            except subprocess.CalledProcessError as error:
+                print(error.stdout, end="", file=sys.stderr)
+                print(error.stderr, end="", file=sys.stderr)
+                raise
 
         assert run("--version").stdout.strip() == "smi2ass 1.5"
         assert "--settings-dir" in run("--help").stdout
