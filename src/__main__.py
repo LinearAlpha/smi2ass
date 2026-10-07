@@ -8,7 +8,7 @@ if __package__:
     from .smi2ass import smi2ass
 else:
     from smi2ass import smi2ass
-    __version__ = "1.5"
+    __version__ = "1.5.1"
 
 
 def cmd_arg() -> argparse.ArgumentParser:

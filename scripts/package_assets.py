@@ -27,7 +27,7 @@ def main():
         for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):
             shutil.copy2(ROOT / filename, stage / filename)
         info = {
-            "version": "1.5", "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+            "version": "1.5.1", "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "python": sys.version, "platform": platform.platform(),
             "packages": subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True).splitlines(),
         }

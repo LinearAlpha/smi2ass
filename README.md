@@ -4,14 +4,14 @@
 
 ## Download or install
 
-[Download V1.5](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5) for **Windows x86-64** or **Linux x86-64**. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. V1.5 Linux binaries are built on Ubuntu 22.04 and require glibc 2.35 or newer.
+[Download V1.5.1](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5.1) for **Windows x86-64** or **Linux x86-64**. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. V1.5.1 Linux binaries are built and tested on Ubuntu 26.04.
 
 The release includes `SHA256SUMS.txt` for verifying downloads. Each executable archive includes `BUILD-INFO.json` identifying the source commit and build dependencies.
 
 For a Python installation, use **Python 3.11 or later** and install the wheel attached to the release:
 
 ```shell
-python -m pip install smi2ass-1.5-py3-none-any.whl
+python -m pip install smi2ass-1.5.1-py3-none-any.whl
 ```
 
 Or install from a checkout:
@@ -22,13 +22,13 @@ python -m pip install .
 
 Both installations provide the `smi2ass` command and `python -m smi2ass`. Runtime dependencies (`beautifulsoup4`, `charset-normalizer`, and `webcolors`) are installed automatically. The packages are distributed through GitHub Releases; these commands do not assume a PyPI release.
 
-### V1.5 assets and SHA-256 verification
+### V1.5.1 assets and SHA-256 verification
 
-The [V1.5 release](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5) has seven assets:
+The [V1.5.1 release](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5.1) has seven assets:
 
 - `SHA256SUMS.txt` (checksums for the six distributions below)
-- `smi2ass-1.5-py3-none-any.whl`
-- `smi2ass-1.5.tar.gz`
+- `smi2ass-1.5.1-py3-none-any.whl`
+- `smi2ass-1.5.1.tar.gz`
 - `smi2ass_linux_x86-64.7z`
 - `smi2ass_linux_x86-64.zip`
 - `smi2ass_windows_x86-64.7z`
@@ -59,7 +59,7 @@ awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | sha256sum -c -
 **macOS:**
 
 ```sh
-file='smi2ass-1.5-py3-none-any.whl'
+file='smi2ass-1.5.1-py3-none-any.whl'
 awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | shasum -a 256 -c -
 ```
 

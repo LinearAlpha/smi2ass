@@ -18,7 +18,7 @@ def sample(text, language="ENCC"):
 
 class ReleaseRegressionTest(unittest.TestCase):
     def test_installed_version_matches_cli_version(self):
-        self.assertEqual("1.5", __version__)
+        self.assertEqual("1.5.1", __version__)
         self.assertEqual(__version__, version("smi2ass"))
 
     def test_default_settings_are_independent_of_working_directory(self):

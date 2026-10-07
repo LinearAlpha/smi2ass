@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smi2ass"
-version = "1.5"
+version = "1.5.1"
 description = "A command-line SAMI to SSA/ASS subtitle converter"
 requires-python = ">=3.11"
 readme = "README.md"
