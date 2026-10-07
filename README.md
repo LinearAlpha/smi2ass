@@ -124,7 +124,21 @@ CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.
 
 ## Build distributions
 
-With the virtual environment active:
+For a complete local build, install **Python 3.14 x86-64** and a native C compiler (GCC on Linux or a supported Windows compiler), then run the script for your OS from the checkout:
+
+```shell
+# Linux x86-64
+./build.sh
+```
+
+```powershell
+# Windows x86-64
+.\build.ps1
+```
+
+The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the executable for your OS. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
+
+To run the same steps manually with a Python 3.14 virtual environment active:
 
 ```shell
 python -m pip install . -r requirements-build.txt

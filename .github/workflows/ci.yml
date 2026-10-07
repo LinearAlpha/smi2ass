@@ -73,11 +73,13 @@ jobs:
           cache-dependency-path: |
             pyproject.toml
             requirements-build.txt
-      - run: python -m pip install . -r requirements-build.txt
-      - name: Compile and smoke-test executable
-        run: python scripts/build_executable.py
-      - name: Archive and test extracted ZIP and 7z distributions
-        run: python scripts/package_assets.py
+      - name: Build and verify distributions with build.sh
+        if: runner.os == 'Linux'
+        run: ./build.sh
+      - name: Build and verify distributions with build.ps1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\build.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: executable-${{ matrix.os }}

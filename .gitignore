@@ -9,6 +9,8 @@ __pycache__
 # Temperate ignore
 *.ps1
 *.sh
+!/build.ps1
+!/build.sh
 
 /dist
 /release-assets
