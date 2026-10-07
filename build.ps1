@@ -19,7 +19,9 @@ Push-Location -LiteralPath $PSScriptRoot
 try {
     $env:PYTHONHOME = $null
     $env:PYTHONPATH = $null
-    $VersionCheck = 'import platform, sys; sys.exit(0 if sys.version_info[:2] == (3, 14) and sys.maxsize > 2**32 and platform.machine().lower() in ("amd64", "x86_64") else 1)'
+    # Single quotes inside the Python expression survive legacy PowerShell's
+    # native argument handling as well as PowerShell 7's argument handling.
+    $VersionCheck = "import platform, sys; sys.exit(0 if sys.version_info[:2] == (3, 14) and sys.maxsize > 2**32 and platform.machine().lower() in ('amd64', 'x86_64') else 1)"
     $BootstrapPython = $null
     $BootstrapArgs = @()
     foreach ($candidate in @(
