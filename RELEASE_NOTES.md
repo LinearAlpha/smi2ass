@@ -22,6 +22,49 @@ Use the ZIP or 7z archive for your OS and extract the entire archive. Keep the `
 
 `SHA256SUMS.txt` covers every downloadable distribution. Executable archives include `BUILD-INFO.json` with the source commit, Python version, platform, and installed build/runtime dependencies.
 
+### V1.5 assets and SHA-256 verification
+
+The [V1.5 release](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5) has seven assets:
+
+- `SHA256SUMS.txt` (checksums for the six distributions below)
+- `smi2ass-1.5-py3-none-any.whl`
+- `smi2ass-1.5.tar.gz`
+- `smi2ass_linux_x86-64.7z`
+- `smi2ass_linux_x86-64.zip`
+- `smi2ass_windows_x86-64.7z`
+- `smi2ass_windows_x86-64.zip`
+
+Download `SHA256SUMS.txt` and your chosen distribution from that release into the same directory. Run the following there before extracting or installing, replacing the example filename with your downloaded asset's exact name.
+
+**Windows PowerShell:**
+
+```powershell
+$file = 'smi2ass_windows_x86-64.zip'
+$line = Get-Content .\SHA256SUMS.txt | Where-Object { $_.EndsWith("  $file") }
+if (!$line) { throw "No checksum for $file" }
+$expected = ($line -split '\s+')[0]
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash -ne $expected) {
+    throw "SHA-256 verification failed: $file"
+}
+"Verified: $file"
+```
+
+**Linux:**
+
+```sh
+file='smi2ass_linux_x86-64.zip'
+awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | sha256sum -c -
+```
+
+**macOS:**
+
+```sh
+file='smi2ass-1.5-py3-none-any.whl'
+awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | shasum -a 256 -c -
+```
+
+Proceed only when PowerShell prints `Verified: <filename>` or Linux/macOS prints `<filename>: OK`. A mismatch, missing file, or missing checksum is a verification failure.
+
 ## Contributors
 
 Thanks to @LinearAlpha for maintenance, the class-based converter, configurable ASS styling, CLI/time offsets, and regression CI; @najoan125 for the color fix and charset-normalizer migration; and the original upstream projects by @hojel and @trustin.
