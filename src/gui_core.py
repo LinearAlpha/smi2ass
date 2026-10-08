@@ -44,6 +44,7 @@ def validate_settings(value):
     for key in ("MarginL", "MarginR", "MarginV", "Encoding"):
         if int(style[key]) != style[key]:
             raise ValueError(f"{key} must be a whole number.")
+        style[key] = int(style[key])
     for key in ("Bold", "Italic", "Underline", "StrikeOut"):
         if type(style[key]) is not int or style[key] not in (-1, 0, 1):
             raise ValueError(f"Invalid {key} flag.")
@@ -156,7 +157,7 @@ def prepare_source(source, settings, offset=0):
         for language, lines in converter.ass_lines.items():
             suffix = f"-{language.upper()}" if len(converter.ass_lines) > 1 else ""
             outputs[f"{source.path.stem}{suffix}.ass"] = "".join(lines)
-        if not outputs:
+        if not outputs or not any(len(lines) > 1 for lines in converter.ass_lines.values()):
             raise ValueError("No subtitle cues remain after applying the timing offset.")
         return Prepared(source, outputs)
     except Exception as error:

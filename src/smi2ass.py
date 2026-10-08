@@ -186,14 +186,12 @@ class smi2ass(AssStyle):
             str: Converted time stamp
         """
 
-        hours = int(ms / 3600000)
-        ms -= hours * 3600000
-        minutes = int(ms / 60000)
-        ms -= minutes * 60000
-        seconds = int(ms / 1000)
-        ms -= seconds * 1000
-        ms = round(ms / 10)
-        return "%01d:%02d:%02d.%02d" % (hours, minutes, seconds, ms)
+        # Round before splitting units so 995 ms carries into the next second.
+        centiseconds = round(ms / 10)
+        hours, centiseconds = divmod(centiseconds, 360000)
+        minutes, centiseconds = divmod(centiseconds, 6000)
+        seconds, centiseconds = divmod(centiseconds, 100)
+        return "%01d:%02d:%02d.%02d" % (hours, minutes, seconds, centiseconds)
 
     def __time_lan(self) -> None:
         """Form original SMI file, get timecode in millisecond and in case

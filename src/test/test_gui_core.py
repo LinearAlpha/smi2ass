@@ -97,6 +97,15 @@ class GuiCoreTest(unittest.TestCase):
             self.assertTrue(prepared.error)
             self.assertEqual({},prepared.outputs)
 
+    def test_timing_offset_rounds_into_next_second_and_rejects_empty_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"sample.smi"
+            path.write_text(sample(),encoding="utf-8")
+            source = inspect_source(path)
+            prepared = prepare_source(source,default_settings(),995)
+            self.assertIn("0:00:02.00,0:00:03.00",prepared.outputs["sample.ass"])
+            self.assertTrue(prepare_source(source,default_settings(),-1000).error)
+
     def test_output_conflicts_and_overwrite_authorization(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
