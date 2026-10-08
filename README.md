@@ -191,6 +191,20 @@ For a complete local build, install **Python 3.14 x86-64** and a native C compil
 
 The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the selected executables for your OS. Qt is installed only when the GUI is selected. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
 
+To clean generated files before building, add `-Clean` (Windows) or `--clean` (Linux). To clean without building, use `-CleanOnly` or `--clean-only`:
+
+```powershell
+.\build.ps1 -Clean -Target all # Clean, then build CLI and GUI
+.\build.ps1 -CleanOnly        # Clean and exit
+```
+
+```shell
+./build.sh --clean --target all # Clean, then build CLI and GUI
+./build.sh --clean-only         # Clean and exit
+```
+
+Cleanup removes both targets' `build`, `dist`, and `release-assets` folders, generated project metadata, Python caches under `src`/`scripts`, and the Nuitka crash report. Source code, settings, subtitle files, and virtual environments are preserved. It does not follow links into external directories. Cleanup-only requires the same Python 3.14 interpreter as the build scripts, but installs no dependencies. The shared cleanup can also be run directly with `python scripts/clean_project.py`.
+
 To run the same steps manually with a Python 3.14 virtual environment active:
 
 ```shell

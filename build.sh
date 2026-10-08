@@ -3,12 +3,29 @@
 set -euo pipefail
 
 target=all
-if [[ $# -eq 2 && "$1" == --target ]]; then
-    target="$2"
-elif [[ $# -ne 0 ]]; then
-    echo "Usage: ./build.sh [--target cli|gui|all]" >&2
-    exit 2
-fi
+clean=false
+clean_only=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --target)
+            if [[ $# -lt 2 ]]; then
+                echo "--target requires cli, gui, or all." >&2
+                exit 2
+            fi
+            target="$2"
+            shift
+            ;;
+        --clean) clean=true ;;
+        --clean-only) clean=true; clean_only=true ;;
+        --help|-h)
+            echo "Usage: ./build.sh [--target cli|gui|all] [--clean | --clean-only]"
+            echo "--clean removes generated outputs before building; --clean-only exits after cleanup."
+            exit 0
+            ;;
+        *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+    shift
+done
 case "$target" in cli|gui|all) ;; *) echo "Unknown build target: $target" >&2; exit 2 ;; esac
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
@@ -29,6 +46,13 @@ done
 if [[ -z "$bootstrap_python" ]]; then
     echo "Install Python 3.14 x86-64 and make it available on PATH, then rerun build.sh." >&2
     exit 1
+fi
+
+if [[ "$clean" == true ]]; then
+    "$bootstrap_python" -I scripts/clean_project.py
+fi
+if [[ "$clean_only" == true ]]; then
+    exit 0
 fi
 
 build_python="$PWD/.build-venv/bin/python"

@@ -111,11 +111,15 @@ jobs:
             requirements-build.txt
       - name: Build and verify distributions with build.sh
         if: runner.os == 'Linux'
-        run: ./build.sh --target ${{ matrix.target }}
+        run: |
+          ./build.sh --clean-only
+          ./build.sh --clean --target ${{ matrix.target }}
       - name: Build and verify distributions with build.ps1
         if: runner.os == 'Windows'
         shell: powershell
-        run: .\build.ps1 -Target ${{ matrix.target }}
+        run: |
+          .\build.ps1 -CleanOnly
+          .\build.ps1 -Clean -Target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
           name: executable-${{ matrix.target }}-${{ matrix.os }}

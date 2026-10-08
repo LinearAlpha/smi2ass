@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add clean-before-build and cleanup-only options to the Windows/Linux build scripts. Remove generated outputs, metadata, and caches while preserving source, settings, subtitles, and virtual environments. Verify cleanup in CI.
+
 - Expand `lan_code.json` to 184 languages with ISO code and selected regional SAMI aliases. Preserve existing language codes and unknown fallback; fix case-insensitive `EnglishSC` recognition.
 
 - Add a native desktop GUI with Convert and ASS Settings tabs, drag-and-drop/folder input, background batch conversion, timing offsets, progress, cancellation, and per-file errors.

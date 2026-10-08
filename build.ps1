@@ -2,7 +2,9 @@
 # Build and verify Python distributions and selected Windows executables.
 param(
     [ValidateSet('cli', 'gui', 'all')]
-    [string]$Target = 'all'
+    [string]$Target = 'all',
+    [switch]$Clean,
+    [switch]$CleanOnly
 )
 $ErrorActionPreference = 'Stop'
 
@@ -50,6 +52,14 @@ try {
     if (!$BootstrapPython) {
         throw 'Install Python 3.14 x86-64 with python or py available on PATH, then rerun build.ps1.'
     }
+
+    if ($Clean -or $CleanOnly) {
+        & $BootstrapPython @BootstrapArgs -I scripts/clean_project.py
+        if ($LASTEXITCODE -ne 0) {
+            throw "Project cleanup failed (exit code ${LASTEXITCODE})."
+        }
+    }
+    if ($CleanOnly) { return }
 
     $script:BuildPython = Join-Path $PSScriptRoot '.build-venv\Scripts\python.exe'
     if (Test-Path -LiteralPath '.build-venv') {

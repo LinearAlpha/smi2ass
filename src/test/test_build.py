@@ -14,6 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 try:
     import build_common
+    import clean_project
     import build_executable
     if find_spec("py7zr"):
         import package_assets
@@ -77,6 +78,55 @@ class BuildTargetTest(unittest.TestCase):
                     binaries = {name for name in zipped.namelist() if name.startswith("smi2ass")}
                     self.assertEqual({build_common.executable_name(target)}, binaries)
                     self.assertEqual(target, json.loads(zipped.read("BUILD-INFO.json"))["target"])
+
+
+class CleanProjectTest(unittest.TestCase):
+    def test_clean_removes_generated_files_and_preserves_source_settings_and_venvs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generated = ["build/gui/smi2ass-gui", "dist/smi2ass.whl", "release-assets/archive.zip",
+                         "smi2ass.egg-info/PKG-INFO", "src/smi2ass.egg-info/PKG-INFO",
+                         "__pycache__/root.pyc", "src/test/__pycache__/test.pyc",
+                         "scripts/__pycache__/build.pyc", ".pytest_cache/cache",
+                         "nuitka-crash-report.xml"]
+            preserved = ["src/smi2ass.py", "src/setting/lan_code.json", "scripts/build_executable.py",
+                         "README.md", "input.smi", "output.ass", ".git/config",
+                         ".venv/lib/__pycache__/keep.pyc", ".build-venv/bin/python",
+                         ".wheel-venv/lib/keep.py", ".sdist-venv/lib/keep.py",
+                         "src/.venv/lib/__pycache__/keep.pyc", "scripts/tools/pyvenv.cfg",
+                         "scripts/tools/lib/__pycache__/keep.pyc"]
+            for name in generated + preserved:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+            removed = clean_project.clean_project(root)
+            self.assertIn("build", removed)
+            self.assertTrue(all(not (root / name).exists() for name in generated))
+            for name in preserved:
+                self.assertEqual(name, (root / name).read_text())
+            self.assertEqual([], clean_project.clean_project(root))
+
+    def test_clean_does_not_follow_links_to_files_outside_the_project(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "project"
+            root.mkdir()
+            outside = base / "outside"
+            (outside / "__pycache__").mkdir(parents=True)
+            sentinel = outside / "__pycache__" / "keep.pyc"
+            sentinel.write_text("keep")
+            try:
+                (root / "build").symlink_to(outside, target_is_directory=True)
+                (root / "src").symlink_to(outside, target_is_directory=True)
+                (root / "scripts").mkdir()
+                (root / "scripts" / "linked").symlink_to(outside, target_is_directory=True)
+            except OSError as error:
+                self.skipTest(f"Directory symlinks unavailable: {error}")
+            clean_project.clean_project(root)
+            self.assertEqual("keep", sentinel.read_text())
+            self.assertFalse((root / "build").is_symlink())
+            self.assertTrue((root / "src").is_symlink())
+            self.assertTrue((root / "scripts" / "linked").is_symlink())
 
 
 if __name__ == "__main__":
