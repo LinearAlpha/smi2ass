@@ -77,6 +77,7 @@ class smi2ass(AssStyle):
             # Identify encoding of the file
             with open(smi_file_input, "rb") as f:
                 f_encoding: str | None = charset_normalizer.detect(f.read())["encoding"]
+            self.encoding = f_encoding
             # Reading SMI file
             with open(
                 smi_file_input, "r", encoding=f_encoding, errors="replace"
@@ -255,6 +256,9 @@ class smi2ass(AssStyle):
             sorted(tmp_lines.items(), key=lambda item: len(item[1]))
         )
 
+        if not tmp_lines:
+            raise ValueError("No valid subtitle cues found. Check the SAMI file and timing offset.")
+
         # Prepare list to hold language code and present of language compare
         # with largest language.
         # line_count structure: [lan code: str, percent: float]
@@ -398,8 +402,8 @@ class smi2ass(AssStyle):
             # Only add converted line when there is content
             if len(contents.strip()) != 0:
                 tmp_ass_lines.append(
-                    "Dialogue: 0,%s,%s,Default,,0000,0000,0000,,%s\n"
-                    % (track_start, track_end, contents)
+                    "Dialogue: 0,%s,%s,%s,,0000,0000,0000,,%s\n"
+                    % (track_start, track_end, self.ass_style["style"]["Name"], contents)
                 )
 
         return tmp_ass_lines
@@ -492,3 +496,4 @@ def save_internal(save_path: Path, lines: list[str]):
 
     with open(save_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
+

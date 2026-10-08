@@ -1,0 +1,118 @@
+from copy import deepcopy
+import os
+from pathlib import Path
+import tempfile
+import time
+import unittest
+from unittest.mock import patch
+
+os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
+try:
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from smi2ass.gui import MainWindow, STYLESHEET
+    from smi2ass.gui_core import PresetStore
+    QT_AVAILABLE = True
+except ImportError:
+    QT_AVAILABLE = False
+
+
+@unittest.skipUnless(QT_AVAILABLE,"GUI extra not installed")
+class DesktopTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+        cls.app.setStyle("Fusion")
+        cls.app.setStyleSheet(STYLESHEET)
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        self.window = MainWindow(self.root/"gui.json")
+        self.window.show()
+        self.errors = []
+        self.window.show_error = self.errors.append
+
+    def wait_idle(self):
+        deadline = time.monotonic()+10
+        while self.window.busy or self.window.jobs:
+            self.app.processEvents()
+            if time.monotonic() > deadline:
+                self.fail("GUI worker did not finish")
+            time.sleep(.01)
+        self.app.processEvents()
+        self.assertEqual([],self.errors)
+
+    def tearDown(self):
+        self.wait_idle()
+        self.window.closing = True
+        self.window.close()
+        self.app.processEvents()
+        self.directory.cleanup()
+
+    def add_source(self, folder="", name="sample.smi"):
+        path = self.root/folder/name
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text("<SAMI><BODY><SYNC Start=1000><P Class=ENCC>Hello<SYNC Start=2000><P Class=ENCC>&nbsp;</BODY></SAMI>",encoding="utf-8")
+        self.window.add_paths([str(path)])
+        self.wait_idle()
+        return path
+
+    def test_settings_apply_persist_and_preview_without_modifying_draft(self):
+        editor = self.window.editor
+        editor.controls[("style","Name")].setText("Cinema")
+        editor.controls[("style","Outline")].setValue(2)
+        editor.alignments.button(8).click()
+        self.assertEqual(8,editor.preview.settings["style"]["Alignment"])
+        self.assertEqual("Default",self.window.active["style"]["Name"])
+        self.assertTrue(self.window.apply_settings())
+        self.assertEqual("Cinema",PresetStore(self.root/"gui.json").active["style"]["Name"])
+        self.assertEqual("Cinema",self.window.convert_preview.settings["style"]["Name"])
+        self.assertFalse(editor.preview.grab().isNull())
+
+    def test_selected_rows_convert_and_existing_output_requires_confirmation(self):
+        self.add_source(name="first.smi")
+        self.add_source(name="second.smi")
+        self.window.table.item(1,0).setCheckState(Qt.CheckState.Unchecked)
+        self.window.output.setText(str(self.root/"output"))
+        self.window.start_conversion()
+        self.wait_idle()
+        path = self.root/"output"/"first.ass"
+        self.assertTrue(path.exists())
+        self.assertFalse((path.parent/"second.ass").exists())
+        path.write_text("keep me",encoding="utf-8")
+        with patch.object(QMessageBox,"exec",return_value=QMessageBox.StandardButton.Cancel):
+            self.window.start_conversion()
+            self.wait_idle()
+        self.assertEqual("keep me",path.read_text(encoding="utf-8"))
+        with patch.object(QMessageBox,"exec",return_value=QMessageBox.StandardButton.Yes):
+            self.window.start_conversion()
+            self.wait_idle()
+        self.assertIn("Hello",path.read_text(encoding="utf-8"))
+
+    def test_duplicate_output_names_are_blocked_and_cancel_writes_nothing(self):
+        self.add_source("a")
+        self.add_source("b")
+        self.window.output.setText(str(self.root/"output"))
+        self.window.start_conversion()
+        self.wait_idle()
+        self.assertFalse((self.root/"output"/"sample.ass").exists())
+        self.assertEqual("Error",self.window.table.item(0,3).text())
+        self.window.start_conversion()
+        self.window.cancel_work()
+        self.wait_idle()
+        self.assertFalse((self.root/"output"/"sample.ass").exists())
+        self.assertIn("Cancelled",self.window.status.text())
+
+    def test_failed_input_stays_visible_and_is_not_selectable(self):
+        path = self.root/"broken.smi"
+        path.write_text("not subtitles",encoding="utf-8")
+        self.window.add_paths([str(path)])
+        self.wait_idle()
+        self.assertEqual("Error",self.window.table.item(0,3).text())
+        self.assertFalse(self.window.convert_button.isEnabled())
+        self.assertTrue(self.window.table.item(0,3).toolTip())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -107,6 +107,32 @@ The converter handles paragraph, line-break, bold, italic, underline, strike-thr
 
 The converter prints the file being processed and diagnostic fragments for malformed language or time tags. For example, a misspelled `Start` attribute can produce `Failed to extract time code`. Correct the `.smi` file and run the conversion again.
 
+## Desktop GUI (development)
+
+The desktop interface in this checkout has **Convert** and **ASS Settings** tabs. Install the optional GUI dependency in your virtual environment and launch it:
+
+```shell
+python -m pip install -e ".[gui]"
+smi2ass-gui
+```
+
+You can also use `python -m smi2ass.gui` or `smi2ass-gui "Episode 01.smi"`. The existing CLI installation and commands remain available.
+
+- **Convert:** add files, drag and drop `.smi`/`.sami` files, or add a folder (including subfolders). Select files, choose an output folder and preset, and optionally set a signed timing offset in milliseconds. Conversion runs in the background; Cancel stops after the current file. Hover over an Error status for details.
+- **ASS Settings:** edit font, emphasis, four colors and their opacity, outline/shadow, alignment, margins, and canvas size. Advanced style options include scaling, spacing, rotation, encoding, title, timer, and script options. The illustrative preview updates immediately; final rendering depends on your video player and installed fonts. Inline SAMI styling can override the base style.
+- **Presets:** Apply to conversion saves the current settings for future sessions. Save preset also creates a named preset. Import/Export settings uses the same JSON format as `ass_styles.json`, so an exported file can be used with the CLI's `--settings-dir` alongside `lan_code.json`. GUI preferences are stored in the current user's application configuration directory.
+
+Existing output files require confirmation before replacement. Sources that would produce the same output filename are marked as errors; convert them to different folders. Timing offsets can discard cues shifted before the start of the video, following the existing converter behavior.
+
+The GUI is a development addition and is not included in the published V1.5.1 assets. Builds from this checkout include both `smi2ass` and `smi2ass-gui` (`.exe` on Windows) in the existing archive filenames. The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives remain Windows/Linux x86-64.
+
+To run the GUI checks with the extra installed:
+
+```shell
+python -m unittest discover -s src/test -v
+python scripts/smoke_gui.py
+```
+
 ## Development and testing
 
 Create and activate a virtual environment, then install the project:
@@ -166,3 +192,4 @@ This project builds on [@hojel's service.subtitles.gomtv](https://github.com/hoj
 | [@hojel](https://github.com/hojel) and [@trustin](https://github.com/trustin) | Original upstream subtitle conversion work from which this project was forked. |
 
 Thanks to everyone who contributes code, tests, bug reports, and improvements. See the [commit history](https://github.com/LinearAlpha/smi2ass/commits/main/) for individual changes. Licensing terms are in [LICENSE.txt](LICENSE.txt).
+

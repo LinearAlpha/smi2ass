@@ -5,3 +5,5 @@ ordered-set
 zstandard
 patchelf; sys_platform == 'linux'
 py7zr
+PySide6-Essentials>=6.10,<7
+

@@ -1,3 +1,10 @@
+# Unreleased
+
+- Add a native desktop GUI with Convert and ASS Settings tabs, drag-and-drop/folder input, background batch conversion, timing offsets, progress, cancellation, and per-file errors.
+- Add a live illustrative style preview, editable ASS settings, persistent presets, and compatible JSON import/export. Require confirmation before replacing existing output files and detect duplicate output names.
+- Keep Qt optional for Python CLI installations; add the `smi2ass-gui` launcher and build a companion GUI executable in each Windows/Linux archive. Test the GUI on Python 3.14 and in both extracted archive formats.
+- Write the selected ASS style name into dialogue events and report a useful error for files with no usable subtitle cues.
+
 # V1.5.1
 
 ## Fixes and improvements
@@ -139,3 +146,4 @@ Proceed only when PowerShell prints `Verified: <filename>` or Linux/macOS prints
 Thanks to @LinearAlpha for maintenance, the class-based converter, configurable ASS styling, CLI/time offsets, and regression CI; @najoan125 for the color fix and charset-normalizer migration; and the original upstream projects by @hojel and @trustin.
 
 [Full changelog](https://github.com/LinearAlpha/smi2ass/compare/V1.4.5...V1.5)
+

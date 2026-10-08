@@ -23,6 +23,8 @@ def main():
         stage.mkdir()
         executable = "smi2ass.exe" if os.name == "nt" else "smi2ass"
         shutil.copy2(ROOT / "build" / executable, stage / executable)
+        gui_executable = "smi2ass-gui.exe" if os.name == "nt" else "smi2ass-gui"
+        shutil.copy2(ROOT / "build" / gui_executable, stage / gui_executable)
         shutil.copytree(ROOT / "build" / "setting", stage / "setting")
         for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):
             shutil.copy2(ROOT / filename, stage / filename)
@@ -49,8 +51,12 @@ def main():
             binary = extracted / executable
             binary.chmod(binary.stat().st_mode | 0o111)
             subprocess.run([sys.executable, str(ROOT / "scripts" / "smoke_test.py"), "--executable", str(binary)], check=True)
+            gui_binary = extracted / gui_executable
+            gui_binary.chmod(gui_binary.stat().st_mode | 0o111)
+            subprocess.run([sys.executable, str(ROOT / "scripts" / "smoke_gui.py"), "--executable", str(gui_binary)], check=True)
     print(f"Created and verified {name}.zip and {name}.7z")
 
 
 if __name__ == "__main__":
     main()
+
