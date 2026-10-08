@@ -1,3 +1,5 @@
+"""Release regressions for installed metadata, bundled defaults, and real file output."""
+
 import contextlib
 from importlib.metadata import version
 from pathlib import Path
@@ -10,6 +12,7 @@ KOREAN = "안녕하세요. 오늘은 날씨가 맑습니다. 자막 변환을 �
 
 
 def sample(text, language="ENCC"):
+    """Include a terminating blank cue so output timing is deterministic."""
     return f'''<SAMI><BODY>
 <SYNC Start=1000><P Class={language}><FONT COLOR=red>{text}</FONT>
 <SYNC Start=2000><P Class={language}>&nbsp;
@@ -17,6 +20,8 @@ def sample(text, language="ENCC"):
 
 
 class ReleaseRegressionTest(unittest.TestCase):
+    """Exercise the installed public API under the same conditions as downloaders."""
+
     def test_installed_version_matches_cli_version(self):
         self.assertEqual("1.5.1", __version__)
         self.assertEqual(__version__, version("smi2ass"))
@@ -27,6 +32,7 @@ class ReleaseRegressionTest(unittest.TestCase):
                 self.assertEqual("kor", AssStyle().get_lang_code("KRCC"))
 
     def test_legacy_and_unicode_encodings_preserve_text_in_saved_output(self):
+        # Longer Korean text gives encoding detection enough bytes for legacy encodings.
         for encoding in ("cp949", "euc_kr", "utf-8", "utf-8-sig", "utf-16"):
             with self.subTest(encoding=encoding), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -55,6 +61,7 @@ class ReleaseRegressionTest(unittest.TestCase):
             self.assertIn("Hello", (root / "output" / "bilingual-ENG.ass").read_text(encoding="utf-8"))
             self.assertIn("안녕하세요", (root / "output" / "bilingual-KOR.ass").read_text(encoding="utf-8"))
             second = root / "second.smi"
+            # Reuse the same instance to catch stale language/text state between batch inputs.
             second.write_text(sample("Next file"), encoding="utf-8")
             converter.to_ass(str(second)).save(root / "output")
             self.assertEqual(["eng"], list(converter.ass_lines))

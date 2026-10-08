@@ -1,3 +1,5 @@
+"""Test desktop conversion/settings logic without importing or starting Qt."""
+
 from copy import deepcopy
 import contextlib
 import io
@@ -13,15 +15,19 @@ from smi2ass.gui_core import (
 
 
 def sample(text="Hello", language="ENCC"):
+    """Provide one visible cue and its blank end boundary for focused conversion tests."""
     return f"<SAMI><BODY><SYNC Start=1000><P Class={language}>{text}<SYNC Start=2000><P Class={language}>&nbsp;</BODY></SAMI>"
 
 
 class GuiCoreTest(unittest.TestCase):
+    """Cover settings validation, timing, persistence, and reviewed output writes."""
+
     def test_unicode_paths_work_with_legacy_console_encoding(self):
         from smi2ass import smi2ass
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"한글.smi"
             path.write_text(sample(),encoding="utf-8")
+            # Simulate a Windows console that cannot encode Korean diagnostic paths.
             console = io.TextIOWrapper(io.BytesIO(),encoding="cp1252")
             with contextlib.redirect_stdout(console):
                 source = inspect_source(path)
@@ -102,6 +108,7 @@ class GuiCoreTest(unittest.TestCase):
             path = Path(directory)/"sample.smi"
             path.write_text(sample(),encoding="utf-8")
             source = inspect_source(path)
+            # 995 ms exercises centisecond carry; the negative cases test zero and empty output.
             prepared = prepare_source(source,default_settings(),995)
             self.assertIn("0:00:02.00,0:00:03.00",prepared.outputs["sample.ass"])
             at_zero = prepare_source(source,default_settings(),-1000)
@@ -120,6 +127,7 @@ class GuiCoreTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             prepared = []
+            # Distinct source folders and case variants still collide on Windows output names.
             for folder,name in (("a","sample.smi"),("b","SAMPLE.smi")):
                 path = root/folder/name
                 path.parent.mkdir()

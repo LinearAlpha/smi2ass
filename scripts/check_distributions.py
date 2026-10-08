@@ -23,6 +23,8 @@ def check_distribution(artifact, gui=False):
         python = bindir / ("python.exe" if sys.platform == "win32" else "python")
         console = bindir / ("smi2ass.exe" if sys.platform == "win32" else "smi2ass")
         python_command = [str(python), "-I"]
+        # Force the artifact to install even if inherited metadata advertises the same version.
+        # pip --isolated also ignores user configuration such as an unrelated PIP_TARGET.
         subprocess.run(python_command + ["-m", "pip", "--isolated", "install",
                                         "--force-reinstall", str(artifact) + ("[gui]" if gui else "")],
                        check=True, cwd=directory, env=env)

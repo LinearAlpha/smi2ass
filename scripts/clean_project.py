@@ -14,6 +14,7 @@ VIRTUAL_ENVS = {".venv", "venv", ".build-venv", ".wheel-venv", ".sdist-venv"}
 
 
 def is_link(path):
+    """Treat Windows junctions like symlinks; older Python versions may lack this API."""
     return path.is_symlink() or getattr(path, "is_junction", lambda: False)()
 
 

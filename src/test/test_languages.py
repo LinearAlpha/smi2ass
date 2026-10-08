@@ -8,6 +8,8 @@ from smi2ass.gui_core import default_settings, inspect_source, prepare_source
 
 
 class LanguageMappingTest(unittest.TestCase):
+    """Keep alias compatibility and CLI/GUI output naming aligned with the shared table."""
+
     def test_legacy_aliases_and_unknown_fallback_are_preserved(self):
         style = AssStyle(verbose=False)
         expected = {
@@ -26,6 +28,7 @@ class LanguageMappingTest(unittest.TestCase):
     def test_iso_and_regional_aliases_are_case_insensitive(self):
         style = AssStyle(verbose=False)
         groups = {
+            # Bibliographic/terminological variants intentionally share the existing output code.
             "fre": ("FR", "FRCC", "FRE", "FRECC", "FRA", "FRACC", "FRFRCC", "FRCACC"),
             "ger": ("DECC", "GERCC", "DEUCC", "DEDECC"),
             "spa": ("ESCC", "SPACC", "ESESCC", "ESMXCC"),
@@ -56,6 +59,7 @@ class LanguageMappingTest(unittest.TestCase):
             "vIvNcC": ("vie", "Xin chào thế giới."),
         }
         start = "".join(f"<SYNC Start=1000><P Class={alias}>{text}" for alias, (_, text) in captions.items())
+        # Give every language its own blank end cue so all tracks have the same boundaries.
         end = "".join(f"<SYNC Start=2000><P Class={alias}>&nbsp;" for alias in captions)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

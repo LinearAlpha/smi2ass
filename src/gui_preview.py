@@ -9,6 +9,7 @@ from .gui_core import color_to_rgb
 
 
 class StylePreview(QWidget):
+    """Paint an approximate style sample using Qt font metrics and ASS canvas coordinates."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.settings = None
@@ -17,6 +18,7 @@ class StylePreview(QWidget):
         self.setToolTip("Illustrative preview. Final font metrics and rendering depend on your video player and installed fonts.")
 
     def set_settings(self, settings):
+        # Preview ownership is separate from the editor/active settings dictionaries.
         self.settings = deepcopy(settings)
         self.update()
 
@@ -98,6 +100,7 @@ class StylePreview(QWidget):
         painter.rotate(-style["Angle"])
 
         def color(key):
+            # QColor's alpha is opacity, opposite to the transparency byte stored by ASS.
             rgb, _ = color_to_rgb(style[key])
             result = QColor(rgb)
             result.setAlpha(255-int(style[key][2:4], 16))

@@ -9,6 +9,7 @@ import tempfile
 
 
 def main():
+    """Launch a headless installed/native GUI and check its JSON report and exit code."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable")
     args = parser.parse_args()
@@ -18,6 +19,7 @@ def main():
     env.pop("PYTHONPATH",None)
     env.pop("PYTHONHOME",None)
     with tempfile.TemporaryDirectory() as directory:
+        # A report also works for Windows GUI executables built without a console.
         report = Path(directory) / "report.json"
         result = subprocess.run(command+["--smoke-test",str(report)],cwd=directory,env=env,
                                 capture_output=True,text=True,encoding="utf-8",timeout=90)

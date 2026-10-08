@@ -57,6 +57,7 @@ def package_target(target):
                 with py7zr.SevenZipFile(seven_zip_path) as archive:
                     archive.extractall(extracted)
             binary = extracted / executable
+            # ZIP extraction can lose Unix execute bits; restore them before launching the copy.
             binary.chmod(binary.stat().st_mode | 0o111)
             smoke_test(target, binary)
     print(f"Created and verified {name}.zip and {name}.7z")

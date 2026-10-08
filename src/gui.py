@@ -365,6 +365,7 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self,"smi2ass",text)
 
     def persist(self):
+        """Save applied settings and UI preferences; the unapplied editor draft stays separate."""
         self.store.active = deepcopy(self.active)
         self.store.output = self.output.text()
         self.store.open_output = self.open_output.isChecked()
@@ -403,6 +404,7 @@ class MainWindow(QMainWindow):
                                     QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Discard
 
     def apply_settings(self):
+        """Validate the draft before replacing the settings used by conversion workers."""
         try:
             self.active = validate_settings(self.editor.settings)
         except ValueError as error:
@@ -487,6 +489,7 @@ class MainWindow(QMainWindow):
             self.add_paths([folder])
 
     def add_paths(self, paths):
+        """Scan files/folders off the UI thread, deduplicating resolved source paths."""
         if self.busy or not paths:
             return
         known = {source.path for source in self.sources}
@@ -515,6 +518,7 @@ class MainWindow(QMainWindow):
         self.status.setText("Ready" if self.sources else "No SAMI files found.")
 
     def handle_update(self,source,status,extra):
+        """Receive worker signals on the UI thread, where table widgets may be changed."""
         if status == "add":
             row = len(self.sources)
             self.sources.append(source)
@@ -531,6 +535,7 @@ class MainWindow(QMainWindow):
             self.table.setItem(row,2,QTableWidgetItem(source.encoding.upper().replace("_","-")))
             self.table.setItem(row,3,QTableWidgetItem("Error" if source.error else "Ready"))
             self.table.item(row,3).setToolTip(source.error)
+            # Capture the source in the callback so the remove action stays tied to this row.
             remove = button("×",lambda _,source=source:self.remove_source(source))
             remove.setAccessibleName(f"Remove {source.path.name}")
             self.table.setCellWidget(row,4,remove)

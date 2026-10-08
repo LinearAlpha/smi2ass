@@ -11,6 +11,7 @@ from .gui_core import PresetStore, write_json
 
 
 def run_smoke(app, report):
+    """Drive inspection then conversion through Qt's event loop and report an exit status."""
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         input_file = root / "bilingual.smi"
@@ -21,6 +22,7 @@ def run_smoke(app, report):
 <SYNC Start=2000><P Class=KRCC>&nbsp;
 </BODY></SAMI>''', encoding="utf-8-sig")
         window = MainWindow(root / "gui.json")
+        # Use disposable preferences and collect modal errors so automation cannot hang.
         failures = []
         window.show_error = failures.append
         window.show()
@@ -37,6 +39,7 @@ def run_smoke(app, report):
         timer = QTimer()
 
         def check():
+            # Poll without blocking Qt: queued signals must reach the window between phases.
             try:
                 if failures:
                     raise AssertionError("\n".join(failures))
@@ -49,6 +52,7 @@ def run_smoke(app, report):
                     assert app.palette().color(QPalette.ColorRole.Window).name() == "#151d26"
                     assert PresetStore(root / "gui.json").theme == "dark"
                     for filename in ("arrow-up.svg", "arrow-down.svg", "arrow-up-dark.svg", "arrow-down-dark.svg", "check.svg"):
+                        # Loading an actual pixmap verifies resource inclusion and the SVG plugin.
                         icon = QIcon(str(Path(__file__).resolve().parent / "gui_icons" / filename))
                         assert not icon.pixmap(15, 15).isNull(), filename
                     window.theme_selector.setCurrentIndex(0)
@@ -71,6 +75,7 @@ def run_smoke(app, report):
                 assert saved.active["style"]["Name"] == "Cinema"
                 assert saved.active["style"]["MarginV"] == 50
                 assert "Cinema" in saved.presets
+                # Windows GUI builds have no console; the report is the external test contract.
                 write_json(report,{"ok":True,"checks":["Qt startup","queue inspection","settings apply",
                     "preset persistence","light/dark themes","packaged control icons",
                     "background conversion","timing offset","multilingual output"]})

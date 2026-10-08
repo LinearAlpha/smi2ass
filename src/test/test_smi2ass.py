@@ -1,3 +1,5 @@
+"""Regression coverage for CSS color names and ASS's BGR inline color format."""
+
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +12,8 @@ from smi2ass import rgb2bgr, smi2ass
 
 
 class ColorConversionTest(unittest.TestCase):
+    """Check both color helpers and the actual markup emitted by conversion."""
+
     def setUp(self) -> None:
         self.setting_path = str(PROJECT_ROOT / "src" / "setting")
 
@@ -43,6 +47,7 @@ class ColorConversionTest(unittest.TestCase):
             output = "".join(converter.ass_lines["eng"])
 
         self.assertIn(r"{\c&H0000ff&}Red text{\c}", output)
+        # A CSS '#' prefix must not leak into ASS override syntax.
         self.assertNotIn("#", output)
 
 

@@ -29,6 +29,7 @@ def main(argv=None):
     app.setOrganizationName("LinearAlpha")
     apply_theme(app)
     if args.smoke_test:
+        # Reuse the real window/event loop in packaged tests, with a machine-readable report.
         from .gui_smoke import run_smoke
         return run_smoke(app, Path(args.smoke_test))
     window = MainWindow()

@@ -14,6 +14,7 @@ from .gui_preview import StylePreview
 
 
 def label(text, role=""):
+    """Create a wrapping label whose object-name role selects shared theme styling."""
     widget = QLabel(text)
     if role:
         widget.setObjectName(role)
@@ -22,6 +23,7 @@ def label(text, role=""):
 
 
 def button(text, callback=None, primary=False):
+    """Create a consistently styled action button with an optional click handler."""
     widget = QPushButton(text)
     widget.setCursor(Qt.CursorShape.PointingHandCursor)
     if primary:
@@ -32,6 +34,7 @@ def button(text, callback=None, primary=False):
 
 
 def card(title=""):
+    """Return a themed container and its layout for assembling settings sections."""
     widget = QFrame()
     widget.setObjectName("card")
     layout = QVBoxLayout(widget)
@@ -122,6 +125,7 @@ class SettingsEditor(QWidget):
             toggle.setAccessibleName(name)
             toggle.setMaximumWidth(50)
             self.register(toggle, "style", name)
+            # Capture each field name at connection time; ASS uses -1 for enabled emphasis.
             toggle.toggled.connect(lambda checked, key=name: self.update_value("style",key,-1 if checked else 0))
             toggles.addWidget(toggle)
         toggles.addStretch()
@@ -199,6 +203,7 @@ class SettingsEditor(QWidget):
         grid.setContentsMargins(0,0,0,0)
         self.alignments = QButtonGroup(self)
         self.alignments.setExclusive(True)
+        # ASS numbers follow a numpad: display 7–9 at the top while retaining their IDs.
         for number in range(1,10):
             control = button("•")
             control.setCheckable(True)
@@ -249,6 +254,7 @@ class SettingsEditor(QWidget):
         form.addRow(text,widget)
 
     def update_value(self, section, key, value):
+        """Update only the draft and emit a copy so observers cannot mutate editor state."""
         if self.loading:
             return
         self.settings[section][key] = value

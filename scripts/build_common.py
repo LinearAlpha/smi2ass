@@ -7,6 +7,7 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+# All-target builds keep this order; each compiler consumes the available CPUs in turn.
 TARGETS = ("cli", "gui")
 
 

@@ -42,6 +42,7 @@ def validate_settings(value):
     }
     for key, (low, high) in limits.items():
         number = style[key]
+        # bool is an int subclass, but imported numeric settings must contain real numbers.
         if isinstance(number, bool) or not isinstance(number, (int, float)) or not math.isfinite(number) or not low <= number <= high:
             raise ValueError(f"{key} must be between {low} and {high}.")
     for key in ("MarginL", "MarginR", "MarginV", "Encoding"):
@@ -172,6 +173,7 @@ def prepare_source(source, settings, offset=0):
         for language, lines in converter.ass_lines.items():
             suffix = f"-{language.upper()}" if len(converter.ass_lines) > 1 else ""
             outputs[f"{source.path.stem}{suffix}.ass"] = "".join(lines)
+        # A header-only track is not useful output when offsets remove every visible cue.
         if not outputs or not any(len(lines) > 1 for lines in converter.ass_lines.values()):
             raise ValueError("No subtitle cues remain after applying the timing offset.")
         return Prepared(source, outputs)

@@ -1,23 +1,18 @@
-# Python builtin modules
+"""Load editable defaults and serialize ASS headers in their declared field order."""
+
 import os
 import sys
 import json
 from pathlib import Path
 
-# PIP installed modules
 import webcolors
 
 
 class AssStyle:
-    def __init__(self, setting_path: str = "", verbose: bool = True) -> None:
-        """Reads setting JSON file form local drive and compose into ASS
-        header block. Also, reads language code and color code setting from
-        JSON file from local drive that can convert SMI to ASS style code.
+    """Own one converter's style settings, language aliases, and optional diagnostics."""
 
-        Args:
-            setting_path (str, optional): Path to where JSON files are located.
-            Defaults to packaged settings, or settings beside the executable.
-        """
+    def __init__(self, setting_path: str = "", verbose: bool = True) -> None:
+        """Load independent settings from an override, package, or compiled binary folder."""
 
         # Save input path
         self.verbose = verbose
@@ -42,7 +37,7 @@ class AssStyle:
             "ass_styles.json", self.setting_path
         )
 
-        # Prepare even block of the ass header
+        # This fixed event schema must match the Dialogue rows produced by the converter.
         self.ass_event: str = (
             "[Events]\nFormat: Layer, Start, End, Style, Actor, MarginL, MarginR, MarginV, Effect, Text\n\n"
         )
@@ -54,7 +49,7 @@ class AssStyle:
             str: Composed "Script Info" block of subtitle
         """
 
-        # Shallow copy to protect original data
+        # Read the original mapping without deleting header/comment metadata.
         tmp_dict: dict[str, any] = self.ass_style["ScriptInfo"]
 
         # Adding heading of info section
@@ -72,28 +67,27 @@ class AssStyle:
             if (tmp != "Head") and (tmp != "msg"):
                 tmp_info += f"{tmp}: {tmp_dict[tmp]}\n"
 
-        return tmp_info + "\n"  # Back to home!! LOL
+        return tmp_info + "\n"  # Separate this section from the following style block.
 
     def __compose_styles(self) -> str:
-        """Compose "Styles" block of AAS header in string
+        """Compose "Styles" block of ASS header in string
 
         Returns:
             str: Composed "Styles" block
         """
 
-        # Shallow copy to protect original data
+        # Use the same ordered keys for Format and Style so every value matches its field.
         tmp_dict: dict[str, any] = self.ass_style["style"]
         tmp_head: str = tmp_dict["Head"]
         tmp_format: str = "Format: "
         tmp_style: str = "Style: "
 
-        # Instead of deleting used keys, just skip it
+        # Settings JSON keeps Head first; it names the section, not a style field.
         for tmp in list(tmp_dict.keys())[1:]:
-            # if tmp != "Head":
             tmp_format += f"{tmp}, "
             tmp_style += f"{tmp_dict[tmp]},"
 
-        # Remove "," to avoid when feed into video
+        # ASS records must not end with an extra empty comma-separated field.
         tmp_format = tmp_format[:-2]
         tmp_style = tmp_style[:-1]
 
@@ -127,11 +121,13 @@ class AssStyle:
         try:
             print(message)
         except UnicodeEncodeError:
+            # Escape only console diagnostics; Unicode input/output paths stay intact.
             encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
             print(message.encode(encoding, errors="backslashreplace").decode(encoding))
 
     def color2hex(self, str_color: str) -> str:
-        return webcolors.name_to_hex(str_color).lstrip('#') # it can get rid of '#' in front of the hex code
+        """Return six RGB hex digits without the CSS prefix, ready for BGR conversion."""
+        return webcolors.name_to_hex(str_color).lstrip('#')
 
     def update_title(self, title: str) -> None:
         """Update title value in the Script Info block
@@ -202,15 +198,7 @@ class AssStyle:
 
 
 def load_setting(fs_name: str, fs_path: Path | str) -> dict[str, any]:
-    """Reading json file from file
-
-    Args:
-        fs_name (str): JSON file name
-        fs_path (str): Path to JSON file
-
-    Returns:
-        dict[str, any]: Parsed JSON data from file
-    """
+    """Read a fresh UTF-8 JSON mapping so converter instances do not share mutations."""
 
     file2open = Path(fs_path) / fs_name
     with open(file2open, "r", encoding="utf-8") as f:
@@ -224,6 +212,7 @@ def is_nuitka() -> bool:
         bool: True, if compiled with Nuitka
     """
 
+    # Nuitka exposes a compiled marker; onefile children also inherit the parent marker.
     flag1: bool = "__compiled__" in globals()
     flag2: bool = "NUITKA_ONEFILE_PARENT" in os.environ
 

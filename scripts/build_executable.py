@@ -43,6 +43,7 @@ def build_target(target):
     # Expose tools in the active venv without requiring shell activation.
     env["PATH"] = str(Path(sys.executable).absolute().parent) + os.pathsep + env.get("PATH", "")
     subprocess.run(command, check=True, cwd=ROOT, env=env)
+    # Editable sibling defaults take priority over embedded data in compiled programs.
     settings = output / "setting"
     if settings.exists():
         shutil.rmtree(settings)

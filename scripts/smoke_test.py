@@ -11,6 +11,7 @@ KOREAN = "안녕하세요. 오늘은 날씨가 맑습니다. 자막 변환을 �
 
 
 def sample(text: str, language: str = "ENCC") -> str:
+    """Make one visible cue followed by a blank cue that defines its end time."""
     return f'''<SAMI><BODY>
 <SYNC Start=1000><P Class={language}><FONT COLOR=red>{text}</FONT>
 <SYNC Start=2000><P Class={language}>&nbsp;
@@ -18,14 +19,17 @@ def sample(text: str, language: str = "ENCC") -> str:
 
 
 def main() -> None:
+    """Exercise real commands and output files from an isolated temporary working folder."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable")
     args = parser.parse_args()
+    # Module mode uses -I so imports cannot silently fall back to the source checkout.
     command = [str(Path(args.executable).resolve())] if args.executable else [sys.executable, "-I", "-m", "smi2ass"]
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
 
         def run(*arguments):
+            """Capture successful output, but expose the original CLI diagnostics on failure."""
             try:
                 return subprocess.run(command + list(arguments), cwd=root, check=True,
                                       text=True, encoding="utf-8", capture_output=True)
@@ -76,6 +80,7 @@ def main() -> None:
                     run("-o", "external-output", str(english))
                     assert "Custom Test Font" in (root / "external-output" / "English sample.ass").read_text(encoding="utf-8")
                 finally:
+                    # Archive verification temporarily edits defaults; always restore the artifact.
                     external.write_bytes(original)
         # Reusing one converter across files must not carry languages forward.
         run("-o", "batch", str(bilingual), str(english))

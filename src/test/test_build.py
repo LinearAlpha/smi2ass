@@ -23,11 +23,14 @@ finally:
 
 
 class BuildTargetTest(unittest.TestCase):
+    """Inspect compiler commands and real archives without running native compilation."""
+
     def test_cli_and_gui_builds_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "src" / "setting").mkdir(parents=True)
             (root / "src" / "setting" / "ass_styles.json").write_text("{}")
+            # Mock expensive processes and CPU availability, retaining real settings copying.
             with patch.object(build_executable, "ROOT", root), \
                  patch.object(build_executable.os, "process_cpu_count", return_value=8, create=True), \
                  patch.object(build_executable.subprocess, "run") as compile_run, \
@@ -61,6 +64,7 @@ class BuildTargetTest(unittest.TestCase):
             seen = []
 
             def verify(target, binary):
+                # Fake executable contents identify the target after actual ZIP/7z extraction.
                 self.assertEqual(target, binary.read_text())
                 self.assertEqual(build_common.executable_name(target), binary.name)
                 self.assertEqual("{}", (binary.parent / "setting" / "ass_styles.json").read_text())
@@ -84,6 +88,8 @@ class BuildTargetTest(unittest.TestCase):
 
 
 class CleanProjectTest(unittest.TestCase):
+    """Model generated and preserved files in temporary roots before exercising cleanup."""
+
     def test_clean_removes_generated_files_and_preserves_source_settings_and_venvs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -118,6 +124,7 @@ class CleanProjectTest(unittest.TestCase):
             (outside / "__pycache__").mkdir(parents=True)
             sentinel = outside / "__pycache__" / "keep.pyc"
             sentinel.write_text("keep")
+            # The sentinel sits outside the project and must survive every redirected path.
             try:
                 (root / "build").symlink_to(outside, target_is_directory=True)
                 (root / "src").symlink_to(outside, target_is_directory=True)

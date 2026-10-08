@@ -1,3 +1,5 @@
+"""Offscreen integration tests for real desktop controls and worker-driven conversion."""
+
 from copy import deepcopy
 from importlib.util import find_spec
 import os
@@ -7,6 +9,7 @@ import time
 import unittest
 from unittest.mock import patch
 
+# Choose the platform before importing Qt; missing extras skip, broken Qt installs fail.
 os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
 QT_AVAILABLE = find_spec("PySide6") is not None
 if QT_AVAILABLE:
@@ -19,6 +22,8 @@ if QT_AVAILABLE:
 
 @unittest.skipUnless(QT_AVAILABLE,"GUI extra not installed")
 class DesktopTest(unittest.TestCase):
+    """Use one QApplication with disposable window preferences for every test."""
+
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
@@ -30,9 +35,11 @@ class DesktopTest(unittest.TestCase):
         self.window = MainWindow(self.root/"gui.json")
         self.window.show()
         self.errors = []
+        # Collect warnings instead of opening a modal dialog that would block the test runner.
         self.window.show_error = self.errors.append
 
     def wait_idle(self):
+        """Pump queued worker signals until both the operation and QThread lifetimes end."""
         deadline = time.monotonic()+10
         while self.window.busy or self.window.jobs:
             self.app.processEvents()
@@ -50,6 +57,7 @@ class DesktopTest(unittest.TestCase):
         self.directory.cleanup()
 
     def add_source(self, folder="", name="sample.smi"):
+        """Queue a minimal real file and wait for its asynchronous inspection."""
         path = self.root/folder/name
         path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text("<SAMI><BODY><SYNC Start=1000><P Class=ENCC>Hello<SYNC Start=2000><P Class=ENCC>&nbsp;</BODY></SAMI>",encoding="utf-8")
@@ -108,6 +116,7 @@ class DesktopTest(unittest.TestCase):
         self.assertTrue(path.exists())
         self.assertFalse((path.parent/"second.ass").exists())
         path.write_text("keep me",encoding="utf-8")
+        # Patch only the user's answer; preparation and filesystem writes still execute.
         with patch.object(QMessageBox,"exec",return_value=QMessageBox.StandardButton.Cancel):
             self.window.start_conversion()
             self.wait_idle()

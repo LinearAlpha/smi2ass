@@ -1,4 +1,5 @@
-# Python built in modules
+"""Parse SAMI cues into language tracks and convert inline markup to ASS events."""
+
 import re
 from typing import Self
 from collections import defaultdict
@@ -19,13 +20,10 @@ else:  # Retain direct source execution.
 
 
 class smi2ass(AssStyle):
-    def __init__(self, smi_path: str = "", **kwargs) -> None:
-        """Class constructor, this class only initializes when SMI file path
-        is given as input variable
+    """Reuse style/offset settings across inputs while keeping each file's cues separate."""
 
-        Args:
-            smi_path (str, optional): Smi file path. Defaults to "".
-        """
+    def __init__(self, smi_path: str = "", **kwargs) -> None:
+        """Load settings immediately and optionally preprocess an initial SAMI file."""
 
         # Initializing parent class
         super().__init__(**kwargs)
@@ -33,13 +31,9 @@ class smi2ass(AssStyle):
         self.path2smi: Path  # Path to SMI file
         self.smi_sgml: str
         self.smi_sgml_bs: ResultSet
-        # The value that  hold smi lines by each language. The language code
-        # is used as key of the dictionary.
-        # Each dictionary key is holding list as [lines, time code in ass]
+        # Each language maps to [BeautifulSoup sync block, ASS timestamp, milliseconds] rows.
         self.smi_lines: dict[str, list[any]] = defaultdict(list)
-        # The value that holds converted lines from SMI subtitle. The language
-        # will be used as key of the dictionary.
-        # Each key will hold list as [lines of ass formatted subtitle]
+        # Each output track contains its header followed by complete Dialogue records.
         self.ass_lines: dict[str, list[str]] = defaultdict(list)
         # Flag initialization process is complete before converting to ASS
         self.flag_preprocess: bool = False
@@ -48,23 +42,15 @@ class smi2ass(AssStyle):
         self.flag_time_offset: bool = False
         self.time_offset: int = 0
 
-        # Only initialize the class when SMI file path is provided
+        # Delayed preprocessing lets callers set style and offset before reading cues.
         if smi_path != "":
             self.__preprocess(smi_path)
 
     def __preprocess(self, smi_file_input: str) -> None:
-        """Initializing class by provided SMI file path.
-        This function read SMI file, clean white space and parse SMI subtitle
-        with HTML parser.
-
-        Args:
-            smi_path (str): SMI file path
-
-        Raises:
-            IOError: Neither file is not exist or cannot access file
-        """
+        """Reset per-file state, decode input, and extract language/timestamp groups."""
 
         self.path2smi = Path(smi_file_input)  # Saving input path
+        # A reused converter must not carry languages or output text from the previous file.
         self.flag_preprocess = False
         self.smi_lines.clear()
         self.ass_lines.clear()
@@ -74,7 +60,7 @@ class smi2ass(AssStyle):
 
         # Check if file is accessible. If it is not, program will raise error.
         try:
-            # Identify encoding of the file
+            # Detect from bytes before decoding legacy Korean and Unicode subtitle files.
             with open(smi_file_input, "rb") as f:
                 f_encoding: str | None = charset_normalizer.detect(f.read())["encoding"]
             self.encoding = f_encoding
@@ -94,16 +80,16 @@ class smi2ass(AssStyle):
         # Parse SMI with BeautifulSoup with HTML parser
         self.smi_sgml_bs = bs(self.smi_sgml, "html.parser").find_all("sync")
 
-        # Get timecode for each lines and septate out subtitle in each language
+        # Keep sync blocks together so each language can derive cue ends from its next start.
         self.__time_lan()
 
-        # Preprocess is complete, not it can convert to ass
+        # Only mark ready after parsing and timestamp validation succeed.
         self.flag_preprocess = True
 
     def __convert_whitespace(self) -> None:
-        """Converting CRLF, LF or TAB to white space."""
+        """Legacy whitespace pass; its unassigned replacements currently leave text intact."""
 
-        # Some subtitle uses TAB as space character
+        # TODO: assign str.replace results when deliberately changing normalization behavior.
         whitespace: list[str] = ["\u000D\u000A", "\u000A", "\u000D"]
 
         # CRLF, LF to a whitespace
@@ -114,9 +100,7 @@ class smi2ass(AssStyle):
         self.smi_sgml.replace("\t", "    ")
 
     def __convert_ss(self) -> None:
-        """Converting special characters to ASCII code with defined flag, so
-        it can convert correctly at the end.
-        """
+        """Protect spaces around markup with placeholders decoded after tag conversion."""
 
         # Defining special characters in unicode
         char_ss: list[str] = [
@@ -139,20 +123,18 @@ class smi2ass(AssStyle):
             "\u3000",
         ]
 
-        # Replace special space characters so that Beautifulsoup
-        # can't remove them
+        # Legacy Unicode replacements are unassigned; only the regex passes below mutate text.
         for tmp_ss in char_ss:
             self.smi_sgml.replace(
                 tmp_ss, f"smi2ass_unicode({str(ord(tmp_ss))})"
             )
 
-        # Replace space around a tag with "&nbsp;", so that they are not
-        # stripped when we replace a tag.
+        # Placeholders preserve ordinary spaces while BeautifulSoup replaces inline tags.
         self.smi_sgml = re.sub(r"> +<", ">smi2ass_unicode(32)<", self.smi_sgml)
         self.smi_sgml = re.sub(r"> +", ">smi2ass_unicode(32)", self.smi_sgml)
         self.smi_sgml = re.sub(r" +<", "smi2ass_unicode(32)<", self.smi_sgml)
 
-        # but not <rt>
+        # Ruby annotations should not inherit padding from these placeholders.
         self.smi_sgml = re.sub(
             r"< *[Rr][Tt] *>(smi2ass_unicode\([0-9]+\))+",
             "<rt>",
@@ -165,9 +147,7 @@ class smi2ass(AssStyle):
         )
 
     def __add_sync_tag(self) -> None:
-        """Closing the <sync> tags to avoid tag recursion when it is parses by
-        BeautifulSoup
-        """
+        """Insert sync boundaries so SAMI's usually unclosed tags do not nest cues."""
 
         # Remove </sync>
         self.smi_sgml = re.sub(r"</ *[Ss][Yy][Nn][Cc] *>", "", self.smi_sgml)
@@ -194,14 +174,7 @@ class smi2ass(AssStyle):
         return "%01d:%02d:%02d.%02d" % (hours, minutes, seconds, centiseconds)
 
     def __time_lan(self) -> None:
-        """Form original SMI file, get timecode in millisecond and in case
-        of the subtitle contained multiple language separate out for each
-        language.
-
-        If language is less then 10% compare with largest language, it might
-        be misuse of class name tag on SMI subtile.
-        Thus, in that case this function will be merge language to largest
-        """
+        """Group valid sync blocks by normalized language, applying offsets in milliseconds."""
 
         tmp_lines: dict[str, list[any]] = defaultdict(list)
         time_code: int  # Prepare valuable to hold time in ms.
@@ -219,14 +192,8 @@ class smi2ass(AssStyle):
                 self.log(f"Failed to extract language class: {lines}")
                 self.log('Language has been set to "UNKNOWNCC"')
 
-            # for index, lines in enumerate(self.smi_sgml_bs):
-            # Get timecode from <SYNC Start= > tag
-            # If case when there is error, the time_code is set to "-1"
+            # -1 marks malformed/negative starts and must remain invalid after an offset.
             try:
-                # original code uses regular expression to get timecode. Based
-                # on some sample SMIs, it seems not need to use regular
-                # expression
-                # time_code = int(re.sub(r'\..*$', '', lines['start']))
                 time_code = int(lines["start"])
                 if time_code < 0:
                     time_code = -1
@@ -249,8 +216,7 @@ class smi2ass(AssStyle):
                     [lines, self.__ms2timestamp(time_code), time_code]
                 )
 
-        # Sort the dictionary by the length of the list associated with
-        # each key
+        # Ascending cue counts put the shortest track first (also determines output order).
         tmp_lines = dict(
             sorted(tmp_lines.items(), key=lambda item: len(item[1]))
         )
@@ -258,11 +224,11 @@ class smi2ass(AssStyle):
         if not tmp_lines:
             raise ValueError("No valid subtitle cues found. Check the SAMI file and timing offset.")
 
-        # Prepare list to hold language code and present of language compare
-        # with largest language.
-        # line_count structure: [lan code: str, percent: float]
+        # Legacy imbalance check records [language, cue count, ratio to first track].
+        # TODO: revisit this heuristic separately: the current baseline is the shortest track,
+        # so nonempty groups cannot reach its <= 10% merge threshold.
         line_count: list[any] = []
-        # First key from the dictionary, which has largest lines.
+        # Use the first (shortest) track as the existing ratio baseline.
         tmp_key: str = list(tmp_lines.keys())[0]
         for tmp_lang in tmp_lines.keys():
             tmp_len: int = len(tmp_lines[tmp_lang])
@@ -273,7 +239,7 @@ class smi2ass(AssStyle):
         if len(line_count) != 1:
             for tmp in line_count:
                 tmp_key: str = tmp[0]
-                # If language is less then or equal to 10%, merge to largest
+                # Legacy merge branch for tracks at or below the baseline's 10% threshold.
                 if tmp[2] <= 0.1:
                     tmp_lines[line_count[0]] += tmp_lines[tmp_key]
                     del tmp_lines[tmp_key]
@@ -303,6 +269,7 @@ class smi2ass(AssStyle):
                 tmp_tag.extract()
 
     def __core(self, lines2conv: list[list[any]]) -> list[str]:
+        """Render one language track; inline tag replacement consumes its parsed blocks."""
         # Setting first item to be ASS style header
         tmp_ass_lines: list[str] = [self.ass_header()]
 
@@ -313,7 +280,7 @@ class smi2ass(AssStyle):
             # Setting converted timecode
             track_start: str = lines2conv[i][1]  # Start time of subtitle
 
-            # Setting end time code
+            # SAMI gives starts only: the next cue ends this one; the final cue gets one second.
             try:
                 track_end: str = lines2conv[i + 1][1]  # End time of subtitles
             except:
@@ -340,7 +307,7 @@ class smi2ass(AssStyle):
             # Convert strikes (s) tag
             self.__tag_conv(tmp_line.find_all("s"), "{\\s1}%s{\\s0}")
 
-            # Convert ruby (rt) tag
+            # Legacy annotation pass targets remaining <s> tags; this is not full ruby support.
             self.__tag_conv(
                 tmp_line.find_all("s"),
                 "{\\fscx50}{\\fscy50}&nbsp;%s&nbsp;{\\fscx100}{\\fscy100}",
@@ -392,14 +359,14 @@ class smi2ass(AssStyle):
                 r"smi2ass_unicode\(([0-9]+)\)", r"&#\1;", contents
             )
 
-            # Converting ASCII to special character
+            # Decode both space placeholders and ordinary HTML character entities.
             contents = html.unescape(contents)
 
             # Removes next line character to avoid error when it sets loading
             contents = re.sub("\n", "", contents, len(contents) - 1)
 
             # Dialogue records must reference the selected style name in [V4+ Styles].
-            # Only add converted line when there is content
+            # Blank sync blocks end the previous cue but do not create visible Dialogue rows.
             if len(contents.strip()) != 0:
                 tmp_ass_lines.append(
                     "Dialogue: 0,%s,%s,%s,,0000,0000,0000,,%s\n"
@@ -409,33 +376,19 @@ class smi2ass(AssStyle):
         return tmp_ass_lines
 
     def update_file2conv(self, smi_path: str) -> Self:
-        """Re-initialing class with new SMI file
-
-        Args:
-            smi_path (str): SMI file path
-
-        Returns:
-            Self: Returning itself
-        """
+        """Load a new input, retaining style/offset settings, and return self for chaining."""
 
         self.__preprocess(smi_path)
 
         return self
 
     def set_time_offset(self, offset: int) -> None:
+        """Set a millisecond offset for subsequent preprocessing; negative values advance cues."""
         self.flag_time_offset = True
         self.time_offset = offset
 
     def to_ass(self, smi_path: str = "") -> Self:
-        """Converting SMI subtitle to ASS
-
-        Args:
-            smi_path (str, optional): In case when need to update file to
-            convert. Defaults to "".
-
-        Returns:
-            Self: Returning itself
-        """
+        """Convert the loaded input or load a new path, then return self for save chaining."""
 
         # If there is path input then update to new SMI file
         if smi_path != "":
@@ -454,16 +407,12 @@ class smi2ass(AssStyle):
         return self
 
     def save(self, path2save: str | Path = "") -> None:
-        """Save converted subtitle into the drive. If output path was not
-        provided it will save into where is SMI file located
-
-        Args:
-            path2save (str | Path, optional): Input path. Defaults to "".
-        """
+        """Write UTF-8 tracks beside the source, or into an explicitly selected folder."""
 
         output_dir = self.path2smi.parent if path2save == "" else Path(path2save)
         output_dir.mkdir(parents=True, exist_ok=True)
         multiple_languages = len(self.ass_lines) > 1
+        # Preserve plain names for one track; language suffixes distinguish multilingual output.
         for language, lines in self.ass_lines.items():
             suffix = f"-{language.upper()}" if multiple_languages else ""
             ass_path = output_dir / f"{self.path2smi.stem}{suffix}.ass"
@@ -487,12 +436,7 @@ def rgb2bgr(rgb: str) -> str:
 
 
 def save_internal(save_path: Path, lines: list[str]):
-    """Helper function to combine save operation. Just try to be lazy
-
-    Args:
-        save_path (Path): Output path
-        lines (list[str]): Data that try to write into drive
-    """
+    """Write already formatted ASS records as UTF-8 without adding extra separators."""
 
     with open(save_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
