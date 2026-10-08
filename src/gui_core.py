@@ -105,6 +105,7 @@ class PresetStore:
         self.presets = {"Default": deepcopy(self.active)}
         self.output = str(Path.home() / "Subtitles")
         self.open_output = False
+        self.theme = "light"
         self.load_error = ""
         if self.path.exists():
             try:
@@ -113,6 +114,7 @@ class PresetStore:
                 self.presets.update({name: validate_settings(settings) for name, settings in data["presets"].items() if name != "Default"})
                 self.output = str(data.get("output", self.output))
                 self.open_output = bool(data.get("open_output", False))
+                self.theme = "dark" if data.get("theme") == "dark" else "light"
             except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
                 self.active = default_settings()
                 self.presets = {"Default": deepcopy(self.active)}
@@ -120,7 +122,7 @@ class PresetStore:
 
     def save(self):
         write_json(self.path, {"active": validate_settings(self.active), "presets": self.presets,
-                              "output": self.output, "open_output": self.open_output})
+                              "output": self.output, "open_output": self.open_output, "theme": self.theme})
 
 
 @dataclass

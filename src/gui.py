@@ -2,6 +2,7 @@
 from copy import deepcopy
 from pathlib import Path
 import sys
+import re
 import threading
 
 from . import __version__
@@ -11,6 +12,7 @@ from .gui_launcher import main
 STYLESHEET = """
 QWidget { font-family: 'Segoe UI', 'Noto Sans', sans-serif; font-size: 13px; color: #26343c; }
 QMainWindow, QWidget#page { background: #f6f8f9; }
+QFrame#dropZone { background: #f5fafb; border: 1px dashed #9fc7d0; border-radius: 8px; }
 QFrame#card { background: white; border: 1px solid #dfe5e8; border-radius: 12px; }
 QLabel { background: transparent; border: none; }
 QLabel#title { font-size: 27px; font-weight: 600; }
@@ -54,12 +56,32 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: trans
 STYLESHEET = STYLESHEET.replace("@ICONS@", (Path(__file__).resolve().parent / "gui_icons").as_posix())
 
 
+# Map the shared control styles to dark surfaces without changing layout.
+DARK_COLORS = {
+    "#f5fafb": "#233943", "#9fc7d0": "#5c91a1",
+    "#f6f8f9": "#151d26", "#26343c": "#e4edf3", "#dfe5e8": "#354352",
+    "#087e91": "#69cfdf", "#697983": "#a4b5c3", "#9c6a24": "#f0ca86",
+    "#fff2d7": "#493b25", "#d6dfe4": "#435363", "#edf6f8": "#293e49",
+    "#78b5c0": "#69b4c3", "#dff2f5": "#24434e", "#11869a": "#36a9bd",
+    "#087184": "#8bdbea", "#eef1f3": "#26313d", "#96a1a9": "#80909f",
+    "#e3e7e9": "#354352", "#dce8eb": "#2b404b", "#83939b": "#93a5b0",
+    "#e3e9ec": "#354352", "#f4f8f9": "#263440", "#65757f": "#a4b5c3",
+    "#edf0f2": "#354352", "#e8f5f7": "#24434e", "#f5f8f9": "#263440",
+    "#6a7881": "#a4b5c3", "#b5c4cc": "#607384", "#e4ecef": "#354352",
+    "#d1dce1": "#516374", "#edf2f4": "#263440", "#a4b2ba": "#607384",
+}
+DARK_STYLESHEET = re.sub(r"#[0-9a-f]{6}", lambda match: DARK_COLORS.get(match[0], match[0]), STYLESHEET)
+DARK_STYLESHEET = DARK_STYLESHEET.replace("background: white", "background: #202b36")
+DARK_STYLESHEET = DARK_STYLESHEET.replace("arrow-down.svg", "arrow-down-dark.svg").replace("arrow-up.svg", "arrow-up-dark.svg")
+DARK_STYLESHEET += "\nQTabBar::tab:selected { color: #69cfdf; border-bottom-color: #69cfdf; }\nQToolTip { background: #202b36; color: #e4edf3; border: 1px solid #435363; }"
+
+
 # Keep the CLI and --version usable without Qt installed.
 try:
     from PySide6.QtCore import QStandardPaths, QThread, QTimer, Qt, QUrl, Signal
     from PySide6.QtGui import QColor, QDesktopServices, QPalette
     from PySide6.QtWidgets import (
-        QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout,
+        QApplication, QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout,
         QHeaderView, QInputDialog, QLayout, QLineEdit, QMainWindow, QMessageBox, QProgressBar,
         QScrollArea, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
     )
@@ -75,10 +97,11 @@ except ImportError:
     raise
 
 
-def apply_theme(app):
-    """Use a complete light palette, even when Windows uses a dark theme."""
+def apply_theme(app, theme="light"):
+    """Apply a complete palette and matching controls independent of OS settings."""
+    dark = theme == "dark"
     app.setStyle("Fusion")
-    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    app.styleHints().setColorScheme(Qt.ColorScheme.Dark if dark else Qt.ColorScheme.Light)
     palette = QPalette()
     colors = {
         QPalette.ColorRole.Window: "#f6f8f9",
@@ -103,11 +126,13 @@ def apply_theme(app):
         QPalette.ColorRole.Shadow: "#697983",
     }
     for role, color in colors.items():
+        if dark and role not in (QPalette.ColorRole.BrightText, QPalette.ColorRole.HighlightedText):
+            color = "#202b36" if color == "#ffffff" else DARK_COLORS.get(color, color)
         palette.setColor(role, QColor(color))
     for role in (QPalette.ColorRole.Text, QPalette.ColorRole.WindowText, QPalette.ColorRole.ButtonText):
-        palette.setColor(QPalette.ColorGroup.Disabled, role, QColor("#96a1a9"))
+        palette.setColor(QPalette.ColorGroup.Disabled, role, QColor("#80909f" if dark else "#96a1a9"))
     app.setPalette(palette)
-    app.setStyleSheet(STYLESHEET)
+    app.setStyleSheet(DARK_STYLESHEET if dark else STYLESHEET)
 
 
 class Job(QThread):
@@ -133,7 +158,6 @@ class DropZone(QFrame):
         super().__init__()
         self.setAcceptDrops(True)
         self.setObjectName("dropZone")
-        self.setStyleSheet("QFrame#dropZone { background: #f5fafb; border: 1px dashed #9fc7d0; border-radius: 8px; }")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12,14,12,14)
         title = label("↓   Drop .smi files here", "section")
@@ -160,6 +184,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(980, 720)
         path = config_path or Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation)) / "gui.json"
         self.store = PresetStore(path)
+        apply_theme(QApplication.instance(), self.store.theme)
         self.active = deepcopy(self.store.active)
         self.sources = []
         self.jobs = set()
@@ -176,6 +201,15 @@ class MainWindow(QMainWindow):
         header.addWidget(label("▤  smi2ass", "brand"))
         header.addStretch()
         header.addWidget(label("SAMI → ASS", "muted"))
+        header.addSpacing(16)
+        header.addWidget(label("Theme", "muted"))
+        self.theme_selector = QComboBox()
+        self.theme_selector.addItem("Light", "light")
+        self.theme_selector.addItem("Dark", "dark")
+        self.theme_selector.setCurrentIndex(1 if self.store.theme == "dark" else 0)
+        self.theme_selector.setAccessibleName("Application theme")
+        self.theme_selector.currentIndexChanged.connect(self.change_theme)
+        header.addWidget(self.theme_selector)
         layout.addLayout(header)
         self.tabs = QTabWidget()
         self.tabs.addTab(self.make_convert_page(), "Convert")
@@ -185,6 +219,11 @@ class MainWindow(QMainWindow):
         self.refresh_summary()
         if self.store.load_error:
             QTimer.singleShot(0, lambda: self.show_error(self.store.load_error))
+
+    def change_theme(self):
+        self.store.theme = self.theme_selector.currentData()
+        apply_theme(QApplication.instance(), self.store.theme)
+        self.persist()
 
     def make_convert_page(self):
         page = QWidget()

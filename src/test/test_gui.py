@@ -70,6 +70,21 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual("#ffffff", self.app.palette().color(QPalette.ColorRole.Base).name())
         self.assertEqual("#26343c", palette.color(QPalette.ColorRole.Text).name())
 
+    def test_dark_theme_switch_persists_without_changing_ass_settings(self):
+        original = deepcopy(self.window.active)
+        self.window.theme_selector.setCurrentIndex(1)
+        self.app.processEvents()
+        self.assertEqual("#151d26", self.window.palette().color(QPalette.ColorRole.Window).name())
+        self.assertEqual("#e4edf3", self.app.palette().color(QPalette.ColorRole.Text).name())
+        self.assertEqual("dark", PresetStore(self.root/"gui.json").theme)
+        self.assertEqual(original, self.window.active)
+        reopened = MainWindow(self.root/"gui.json")
+        self.assertEqual("dark", reopened.theme_selector.currentData())
+        reopened.closing = True
+        reopened.close()
+        self.window.theme_selector.setCurrentIndex(0)
+        self.assertEqual("light", PresetStore(self.root/"gui.json").theme)
+
     def test_settings_apply_persist_and_preview_without_modifying_draft(self):
         editor = self.window.editor
         editor.controls[("style","Name")].setText("Cinema")
