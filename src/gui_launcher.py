@@ -14,7 +14,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         from PySide6.QtWidgets import QApplication
-        from .gui import MainWindow, STYLESHEET
+        from .gui import MainWindow, apply_theme
     except ImportError as error:
         if isinstance(error, ModuleNotFoundError) and (error.name or "").startswith("PySide6"):
             print('The GUI requires Qt. Install it with: python -m pip install "smi2ass[gui]"', file=sys.stderr)
@@ -25,8 +25,7 @@ def main(argv=None):
     app = QApplication([sys.argv[0]])
     app.setApplicationName("smi2ass")
     app.setOrganizationName("LinearAlpha")
-    app.setStyle("Fusion")
-    app.setStyleSheet(STYLESHEET)
+    apply_theme(app)
     if args.smoke_test:
         from .gui_smoke import run_smoke
         return run_smoke(app, Path(args.smoke_test))

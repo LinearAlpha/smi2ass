@@ -38,5 +38,5 @@ packages = ["smi2ass"]
 package-dir = { smi2ass = "src" }
 
 [tool.setuptools.package-data]
-smi2ass = ["setting/*.json", "setting/*.txt"]
+smi2ass = ["setting/*.json", "setting/*.txt", "gui_icons/*.svg"]
 

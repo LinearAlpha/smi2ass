@@ -24,7 +24,16 @@ QPushButton:checked { background: #dff2f5; border-color: #11869a; color: #087184
 QPushButton#primary { background: #087f95; color: white; border-color: #087f95; font-weight: 600; padding: 10px 22px; }
 QPushButton#primary:hover { background: #096a7b; }
 QPushButton:disabled { background: #eef1f3; color: #96a1a9; border-color: #e3e7e9; }
+QPushButton#primary:disabled { background: #dce8eb; color: #83939b; border-color: #dce8eb; }
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #d6dfe4; border-radius: 6px; padding: 6px; min-height: 20px; }
+QComboBox, QSpinBox, QDoubleSpinBox { padding-right: 30px; }
+QComboBox::drop-down { subcontrol-origin: border; subcontrol-position: top right; width: 26px; border: none; border-left: 1px solid #e3e9ec; }
+QComboBox::down-arrow { image: url("@ICONS@/arrow-down.svg"); width: 12px; height: 8px; }
+QComboBox QAbstractItemView { background: white; color: #26343c; selection-background-color: #dff2f5; selection-color: #087184; }
+QSpinBox::up-button, QDoubleSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 24px; background: #f4f8f9; border-left: 1px solid #e3e9ec; border-bottom: 1px solid #e3e9ec; border-top-right-radius: 6px; }
+QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 24px; background: #f4f8f9; border-left: 1px solid #e3e9ec; border-bottom-right-radius: 6px; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url("@ICONS@/arrow-up.svg"); width: 12px; height: 8px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url("@ICONS@/arrow-down.svg"); width: 12px; height: 8px; }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus { border-color: #11869a; }
 QTabWidget::pane { border: none; }
 QTabBar::tab { padding: 12px 24px; color: #65757f; background: transparent; border-bottom: 3px solid transparent; }
@@ -32,18 +41,23 @@ QTabBar::tab:selected { color: #087f95; border-bottom-color: #087f95; font-weigh
 QTableWidget { border: none; background: white; gridline-color: #edf0f2; selection-background-color: #e8f5f7; selection-color: #26343c; }
 QHeaderView::section { background: #f5f8f9; color: #6a7881; padding: 9px; border: none; font-weight: 500; }
 QCheckBox { spacing: 8px; }
+QCheckBox::indicator, QAbstractItemView::indicator { width: 15px; height: 15px; background: white; border: 1px solid #b5c4cc; border-radius: 3px; }
+QCheckBox::indicator:checked, QAbstractItemView::indicator:checked { background: #087f95; border-color: #087f95; image: url("@ICONS@/check.svg"); }
 QProgressBar { border: none; border-radius: 3px; background: #e4ecef; height: 6px; text-align: center; }
 QProgressBar::chunk { background: #11869a; border-radius: 3px; }
-QScrollArea { background: transparent; }
+QScrollArea { background: #f6f8f9; }
 QScrollBar:vertical { width: 9px; background: transparent; }
 QScrollBar::handle:vertical { background: #d1dce1; border-radius: 4px; min-height: 24px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; border: none; background: transparent; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
 """
+STYLESHEET = STYLESHEET.replace("@ICONS@", (Path(__file__).resolve().parent / "gui_icons").as_posix())
 
 
 # Keep the CLI and --version usable without Qt installed.
 try:
     from PySide6.QtCore import QStandardPaths, QThread, QTimer, Qt, QUrl, Signal
-    from PySide6.QtGui import QDesktopServices
+    from PySide6.QtGui import QColor, QDesktopServices, QPalette
     from PySide6.QtWidgets import (
         QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout,
         QHeaderView, QInputDialog, QLayout, QLineEdit, QMainWindow, QMessageBox, QProgressBar,
@@ -59,6 +73,41 @@ except ImportError:
     if __name__ == "__main__":
         raise SystemExit(main())
     raise
+
+
+def apply_theme(app):
+    """Use a complete light palette, even when Windows uses a dark theme."""
+    app.setStyle("Fusion")
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    palette = QPalette()
+    colors = {
+        QPalette.ColorRole.Window: "#f6f8f9",
+        QPalette.ColorRole.WindowText: "#26343c",
+        QPalette.ColorRole.Base: "#ffffff",
+        QPalette.ColorRole.AlternateBase: "#f5f8f9",
+        QPalette.ColorRole.Text: "#26343c",
+        QPalette.ColorRole.Button: "#ffffff",
+        QPalette.ColorRole.ButtonText: "#26343c",
+        QPalette.ColorRole.BrightText: "#ffffff",
+        QPalette.ColorRole.Highlight: "#087f95",
+        QPalette.ColorRole.HighlightedText: "#ffffff",
+        QPalette.ColorRole.Link: "#087f95",
+        QPalette.ColorRole.LinkVisited: "#087184",
+        QPalette.ColorRole.ToolTipBase: "#ffffff",
+        QPalette.ColorRole.ToolTipText: "#26343c",
+        QPalette.ColorRole.PlaceholderText: "#697983",
+        QPalette.ColorRole.Light: "#ffffff",
+        QPalette.ColorRole.Midlight: "#edf2f4",
+        QPalette.ColorRole.Mid: "#d6dfe4",
+        QPalette.ColorRole.Dark: "#a4b2ba",
+        QPalette.ColorRole.Shadow: "#697983",
+    }
+    for role, color in colors.items():
+        palette.setColor(role, QColor(color))
+    for role in (QPalette.ColorRole.Text, QPalette.ColorRole.WindowText, QPalette.ColorRole.ButtonText):
+        palette.setColor(QPalette.ColorGroup.Disabled, role, QColor("#96a1a9"))
+    app.setPalette(palette)
+    app.setStyleSheet(STYLESHEET)
 
 
 class Job(QThread):

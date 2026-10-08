@@ -11,8 +11,9 @@ os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
 QT_AVAILABLE = find_spec("PySide6") is not None
 if QT_AVAILABLE:
     from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor, QPalette
     from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
-    from smi2ass.gui import MainWindow, STYLESHEET
+    from smi2ass.gui import MainWindow, apply_theme
     from smi2ass.gui_core import PresetStore
 
 
@@ -21,8 +22,7 @@ class DesktopTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
-        cls.app.setStyle("Fusion")
-        cls.app.setStyleSheet(STYLESHEET)
+        apply_theme(cls.app)
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -56,6 +56,19 @@ class DesktopTest(unittest.TestCase):
         self.window.add_paths([str(path)])
         self.wait_idle()
         return path
+
+    def test_theme_overrides_inherited_dark_palette(self):
+        dark = QPalette(self.app.palette())
+        dark.setColor(QPalette.ColorRole.Window, QColor("#000000"))
+        dark.setColor(QPalette.ColorRole.Base, QColor("#000000"))
+        dark.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
+        self.app.setPalette(dark)
+        apply_theme(self.app)
+        self.app.processEvents()
+        palette = self.window.palette()
+        self.assertEqual("#f6f8f9", palette.color(QPalette.ColorRole.Window).name())
+        self.assertEqual("#ffffff", self.app.palette().color(QPalette.ColorRole.Base).name())
+        self.assertEqual("#26343c", palette.color(QPalette.ColorRole.Text).name())
 
     def test_settings_apply_persist_and_preview_without_modifying_draft(self):
         editor = self.window.editor
