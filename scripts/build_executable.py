@@ -1,56 +1,54 @@
-"""Build and smoke-test a standalone executable using the active environment."""
+"""Build and smoke-test standalone CLI and GUI executables."""
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+# Resolve sibling build tools even when invoked with Python -I.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_common import ROOT, executable_name, selected_targets, smoke_test
+
+CLI_EXCLUSIONS = (
+    "smi2ass.gui", "smi2ass.gui_launcher", "smi2ass.gui_preview",
+    "smi2ass.gui_settings", "smi2ass.gui_smoke", "PySide6",
+)
 
 
-def main() -> None:
-    env = os.environ.copy()
-    # build.sh/build.ps1 invoke the venv interpreter without activating it.
-    # Make tools installed into that environment (including patchelf) visible.
-    env["PATH"] = str(Path(sys.executable).absolute().parent) + os.pathsep + env.get("PATH", "")
-    output = ROOT / "build"
-    output.mkdir(exist_ok=True)
-    name = "smi2ass.exe" if os.name == "nt" else "smi2ass"
-    subprocess.run([
+def build_target(target):
+    output = ROOT / "build" / target
+    output.mkdir(parents=True, exist_ok=True)
+    command = [
         sys.executable, "-m", "nuitka", "--standalone", "--onefile",
         "--assume-yes-for-downloads", "--remove-output", "--jobs=2",
         "--include-package=smi2ass", "--include-package-data=smi2ass",
         "--nofollow-import-to=smi2ass.test",
-        "--nofollow-import-to=smi2ass.gui,smi2ass.gui_launcher,smi2ass.gui_preview,smi2ass.gui_settings,smi2ass.gui_smoke,PySide6",
-        f"--output-dir={output}", f"--output-filename={name}",
-        str(ROOT / "scripts" / "standalone.py"),
-    ], check=True, cwd=ROOT, env=env)
+        f"--output-dir={output}", f"--output-filename={executable_name(target)}",
+    ]
+    if target == "gui":
+        command += ["--enable-plugin=pyside6", "--include-qt-plugins=platforms"]
+        if os.name == "nt":
+            command.append("--windows-console-mode=disable")
+        entry = "gui_standalone.py"
+    else:
+        command.append("--nofollow-import-to=" + ",".join(CLI_EXCLUSIONS))
+        entry = "standalone.py"
+    command.append(str(ROOT / "scripts" / entry))
+    env = os.environ.copy()
+    # Expose tools in the active venv without requiring shell activation.
+    env["PATH"] = str(Path(sys.executable).absolute().parent) + os.pathsep + env.get("PATH", "")
+    subprocess.run(command, check=True, cwd=ROOT, env=env)
     settings = output / "setting"
     if settings.exists():
         shutil.rmtree(settings)
     shutil.copytree(ROOT / "src" / "setting", settings)
-    subprocess.run([
-        sys.executable, str(ROOT / "scripts" / "smoke_test.py"),
-        "--executable", str(output / name),
-    ], check=True)
+    smoke_test(target, output / executable_name(target))
 
-    gui_name = "smi2ass-gui.exe" if os.name == "nt" else "smi2ass-gui"
-    gui_options = ["--windows-console-mode=disable"] if os.name == "nt" else []
-    subprocess.run([
-        sys.executable, "-m", "nuitka", "--standalone", "--onefile",
-        "--assume-yes-for-downloads", "--remove-output", "--jobs=2",
-        "--enable-plugin=pyside6", "--include-qt-plugins=platforms",
-        "--include-package=smi2ass", "--include-package-data=smi2ass",
-        "--nofollow-import-to=smi2ass.test",
-        f"--output-dir={output}", f"--output-filename={gui_name}",
-        *gui_options, str(ROOT / "scripts" / "gui_standalone.py"),
-    ], check=True, cwd=ROOT, env=env)
-    subprocess.run([
-        sys.executable, str(ROOT / "scripts" / "smoke_gui.py"),
-        "--executable", str(output / gui_name),
-    ], check=True)
+
+def main():
+    for target in selected_targets():
+        build_target(target)
 
 
 if __name__ == "__main__":
     main()
-

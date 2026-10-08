@@ -1,4 +1,4 @@
-"""Archive tested executables with editable settings and build provenance."""
+"""Archive each tested executable with editable settings and build provenance."""
 import json
 import os
 from pathlib import Path
@@ -10,53 +10,59 @@ import tempfile
 
 import py7zr
 
-ROOT = Path(__file__).resolve().parents[1]
+# Resolve sibling build tools even when invoked with Python -I.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_common import ROOT, archive_name, executable_name, project_version, selected_targets, smoke_test
 
 
-def main():
+def build_info(target):
+    return {
+        "version": project_version(), "target": target,
+        "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "python": sys.version, "platform": platform.platform(),
+        "packages": subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True).splitlines(),
+    }
+
+
+def package_target(target):
     output = ROOT / "release-assets"
     output.mkdir(exist_ok=True)
-    label = "windows" if os.name == "nt" else "linux"
-    name = f"smi2ass_{label}_x86-64"
+    name = archive_name(target)
+    executable = executable_name(target)
     with tempfile.TemporaryDirectory() as directory:
         stage = Path(directory) / name
         stage.mkdir()
-        executable = "smi2ass.exe" if os.name == "nt" else "smi2ass"
-        shutil.copy2(ROOT / "build" / executable, stage / executable)
-        gui_executable = "smi2ass-gui.exe" if os.name == "nt" else "smi2ass-gui"
-        shutil.copy2(ROOT / "build" / gui_executable, stage / gui_executable)
-        shutil.copytree(ROOT / "build" / "setting", stage / "setting")
+        shutil.copy2(ROOT / "build" / target / executable, stage / executable)
+        shutil.copytree(ROOT / "build" / target / "setting", stage / "setting")
         for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):
             shutil.copy2(ROOT / filename, stage / filename)
-        info = {
-            "version": "1.5.1", "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-            "python": sys.version, "platform": platform.platform(),
-            "packages": subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True).splitlines(),
-        }
-        (stage / "BUILD-INFO.json").write_text(json.dumps(info, indent=2)+"\n", encoding="utf-8")
+        (stage / "BUILD-INFO.json").write_text(json.dumps(build_info(target), indent=2)+"\n", encoding="utf-8")
         zip_path = shutil.make_archive(str(output / name), "zip", stage)
-        with py7zr.SevenZipFile(output / f"{name}.7z", "w") as archive:
+        seven_zip_path = output / f"{name}.7z"
+        with py7zr.SevenZipFile(seven_zip_path, "w") as archive:
             for path in sorted(stage.rglob("*")):
                 if path.is_file():
                     archive.write(path, path.relative_to(stage).as_posix())
-        # Test the actual archives after extraction, not only the build directory.
+        # Exercise each actual archive after extraction, outside the checkout.
         for extension in ("zip", "7z"):
             extracted = Path(directory) / extension
             extracted.mkdir()
             if extension == "zip":
                 shutil.unpack_archive(zip_path, extracted)
             else:
-                with py7zr.SevenZipFile(output / f"{name}.7z") as archive:
+                with py7zr.SevenZipFile(seven_zip_path) as archive:
                     archive.extractall(extracted)
             binary = extracted / executable
             binary.chmod(binary.stat().st_mode | 0o111)
-            subprocess.run([sys.executable, str(ROOT / "scripts" / "smoke_test.py"), "--executable", str(binary)], check=True)
-            gui_binary = extracted / gui_executable
-            gui_binary.chmod(gui_binary.stat().st_mode | 0o111)
-            subprocess.run([sys.executable, str(ROOT / "scripts" / "smoke_gui.py"), "--executable", str(gui_binary)], check=True)
+            smoke_test(target, binary)
     print(f"Created and verified {name}.zip and {name}.7z")
+
+
+def main():
+    for target in selected_targets():
+        package_target(target)
 
 
 if __name__ == "__main__":
     main()
-

@@ -4,6 +4,7 @@ import tempfile
 import time
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon, QPalette
 
 from .gui import MainWindow
 from .gui_core import PresetStore, write_json
@@ -44,6 +45,14 @@ def run_smoke(app, report):
                 if window.busy or window.jobs:
                     return
                 if phase[0] == "inspect":
+                    window.theme_selector.setCurrentIndex(1)
+                    assert app.palette().color(QPalette.ColorRole.Window).name() == "#151d26"
+                    assert PresetStore(root / "gui.json").theme == "dark"
+                    for filename in ("arrow-up.svg", "arrow-down.svg", "arrow-up-dark.svg", "arrow-down-dark.svg", "check.svg"):
+                        icon = QIcon(str(Path(__file__).resolve().parent / "gui_icons" / filename))
+                        assert not icon.pixmap(15, 15).isNull(), filename
+                    window.theme_selector.setCurrentIndex(0)
+                    assert app.palette().color(QPalette.ColorRole.Window).name() == "#f6f8f9"
                     assert len(window.sources) == 1
                     assert window.sources[0].languages == ("eng","kor")
                     assert window.convert_button.isEnabled()
@@ -63,7 +72,8 @@ def run_smoke(app, report):
                 assert saved.active["style"]["MarginV"] == 50
                 assert "Cinema" in saved.presets
                 write_json(report,{"ok":True,"checks":["Qt startup","queue inspection","settings apply",
-                    "preset persistence","background conversion","timing offset","multilingual output"]})
+                    "preset persistence","light/dark themes","packaged control icons",
+                    "background conversion","timing offset","multilingual output"]})
                 timer.stop()
                 app.exit(0)
             except Exception as error:

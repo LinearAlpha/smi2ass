@@ -132,7 +132,7 @@ sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 
 
 Existing output files require confirmation before replacement. Sources that would produce the same output filename are marked as errors; convert them to different folders. Timing offsets can discard cues shifted before the start of the video, following the existing converter behavior.
 
-The GUI is a development addition and is not included in the published V1.5.1 assets. Builds from this checkout include both `smi2ass` and `smi2ass-gui` (`.exe` on Windows) in the existing archive filenames. The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives remain Windows/Linux x86-64.
+The GUI is a development addition and is not included in the published V1.5.1 assets. Builds from this checkout provide separate CLI and GUI archives. GUI binaries use `smi2ass-gui` (`smi2ass-gui.exe` on Windows). The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives remain Windows/Linux x86-64.
 
 To run the GUI checks with the extra installed:
 
@@ -154,7 +154,7 @@ python -m unittest discover -s src/test -v
 python scripts/smoke_test.py
 ```
 
-CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Ubuntu 26.04**, plus desktop GUI tests on Python 3.14. It also tests fresh wheel/source CLI and GUI installations, compiles Linux/Windows executables with Python 3.14 (Linux builds use Ubuntu 26.04), and tests both extracted archive formats outside the checkout.
+CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Ubuntu 26.04**, plus desktop GUI tests on Python 3.14. It also tests fresh wheel/source CLI and GUI installations, independently compiles CLI and GUI Linux/Windows executables with Python 3.14 (Linux builds use Ubuntu 26.04), and tests both extracted archive formats outside the checkout.
 
 ## Build distributions
 
@@ -162,30 +162,41 @@ For a complete local build, install **Python 3.14 x86-64** and a native C compil
 
 ```shell
 # Linux x86-64
-./build.sh
+./build.sh              # Build both CLI and GUI
+./build.sh --target cli # Build only the CLI
+./build.sh --target gui # Build only the GUI
 ```
 
 ```powershell
 # Windows x86-64
-.\build.ps1
+.\build.ps1             # Build both CLI and GUI
+.\build.ps1 -Target cli # Build only the CLI
+.\build.ps1 -Target gui # Build only the GUI
 ```
 
-The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the CLI and GUI executables for your OS. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
+The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the selected executables for your OS. Qt is installed only when the GUI is selected. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
 
 To run the same steps manually with a Python 3.14 virtual environment active:
 
 ```shell
-python -m pip install . -r requirements-build.txt
+python -m pip install ".[gui]" -r requirements-build.txt
 python -m build
 python -m twine check --strict dist/*
-python scripts/check_distributions.py
-python scripts/build_executable.py
-python scripts/package_assets.py
+python scripts/check_distributions.py --gui
+python scripts/build_executable.py --target all
+python scripts/package_assets.py --target all
 ```
 
-Wheel/source distributions are written to `dist`; executable ZIP/7z archives are written to `release-assets`. Nuitka requires a native C compiler (GCC on Linux or a supported Windows compiler); Linux additionally uses `patchelf`. `scripts/build_executable.py` uses the active Python environment and is the authoritative standalone/one-file build configuration.
+Wheel/source distributions are written to `dist`; executables are written to `build/cli` and `build/gui`, with separate ZIP/7z archives in `release-assets`:
 
-To prepare a release, update the project and CLI versions together, update `RELEASE_NOTES.md` and `CHANGELOG.md`, and merge a commit titled `release: V<version>` into `main`. The CI workflow publishes only after all test, package, and executable jobs succeed. It creates a draft, uploads the six distributions plus SHA-256 checksums, then publishes. Ordinary commits and PRs only validate artifacts. An existing release is never overwritten. Maintainers may also run CI manually on `main` with `publish` enabled.
+| Target | Linux archives | Windows archives |
+| --- | --- | --- |
+| CLI | `smi2ass_linux_x86-64.zip` / `.7z` | `smi2ass_windows_x86-64.zip` / `.7z` |
+| GUI | `smi2ass-gui_linux_x86-64.zip` / `.7z` | `smi2ass-gui_windows_x86-64.zip` / `.7z` |
+
+Each archive contains its corresponding executable, editable settings, documentation, and `BUILD-INFO.json`. Nuitka requires a native C compiler (GCC on Linux or a supported Windows compiler); Linux additionally uses `patchelf`. `scripts/build_executable.py` uses the active Python environment and is the authoritative standalone/one-file build configuration.
+
+To prepare a release, update the project and CLI versions together, update `RELEASE_NOTES.md` and `CHANGELOG.md`, and merge a commit titled `release: V<version>` into `main`. The CI workflow publishes only after all test, package, and executable jobs succeed. It creates a draft, uploads the wheel/source distributions and eight CLI/GUI archives plus SHA-256 checksums (11 assets total), then publishes. Ordinary commits and PRs only validate artifacts. An existing release is never overwritten. Maintainers may also run CI manually on `main` with `publish` enabled.
 
 See [release notes](RELEASE_NOTES.md) and [the changelog](CHANGELOG.md).
 

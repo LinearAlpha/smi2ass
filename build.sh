@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-# Build and verify the Python distributions and Linux executable archives.
+# Build and verify Python distributions and selected Linux executables.
 set -euo pipefail
+
+target=all
+if [[ $# -eq 2 && "$1" == --target ]]; then
+    target="$2"
+elif [[ $# -ne 0 ]]; then
+    echo "Usage: ./build.sh [--target cli|gui|all]" >&2
+    exit 2
+fi
+case "$target" in cli|gui|all) ;; *) echo "Unknown build target: $target" >&2; exit 2 ;; esac
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
@@ -33,14 +42,23 @@ else
 fi
 
 "$build_python" -I -m pip --isolated install -r requirements-build.txt
-"$build_python" -I -m pip --isolated install --force-reinstall .
+project='.'
+if [[ "$target" != cli ]]; then
+    project='.[gui]'
+fi
+"$build_python" -I -m pip --isolated install --force-reinstall "$project"
 "$build_python" -I -m pip --isolated check
 # Remove only this project's old Python artifacts before building the new pair.
 rm -f -- dist/smi2ass-*.whl dist/smi2ass-*.tar.gz
 "$build_python" -I -m build
 "$build_python" -I -m twine check --strict dist/*.whl dist/*.tar.gz
-"$build_python" -I scripts/check_distributions.py
-"$build_python" -I scripts/build_executable.py
-"$build_python" -I scripts/package_assets.py
+distribution_options=()
+if [[ "$target" != cli ]]; then
+    distribution_options+=(--gui)
+fi
+"$build_python" -I scripts/check_distributions.py "${distribution_options[@]}"
+"$build_python" -I scripts/build_executable.py --target "$target"
+"$build_python" -I scripts/package_assets.py --target "$target"
 
-echo "Build complete: wheel/source distributions in dist; executable ZIP/7z archives in release-assets."
+echo "Build complete ($target): wheel/source distributions in dist; executable ZIP/7z archives in release-assets."
+
