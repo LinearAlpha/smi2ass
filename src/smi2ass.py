@@ -70,7 +70,7 @@ class smi2ass(AssStyle):
         self.ass_lines.clear()
 
         # Printing which file is currently converting
-        print(f"\nConverting... \n{self.path2smi}")
+        self.log(f"\nConverting... \n{self.path2smi}")
 
         # Check if file is accessible. If it is not, program will raise error.
         try:
@@ -218,8 +218,8 @@ class smi2ass(AssStyle):
             except:  # Bad case: <SYNC Start=7630><P>
                 # If no p class, it will set to unknown language
                 lang_tag = ["UNKNOWNCC"]
-                print(f"Failed to extract language class: {lines}")
-                print('Language has been set to "UNKNOWNCC"')
+                self.log(f"Failed to extract language class: {lines}")
+                self.log('Language has been set to "UNKNOWNCC"')
 
             # for index, lines in enumerate(self.smi_sgml_bs):
             # Get timecode from <SYNC Start= > tag
@@ -232,10 +232,10 @@ class smi2ass(AssStyle):
                 time_code = int(lines["start"])
                 if time_code < 0:
                     time_code = -1
-                    print(f"Negative time code: \n\n{lines}\n")
+                    self.log(f"Negative time code: \n\n{lines}\n")
             except:
                 time_code = -1
-                print(f"Failed to extract time code: \n\n{lines}\n")
+                self.log(f"Failed to extract time code: \n\n{lines}\n")
 
             # Adjust subtitle timecode based on the offset input
             if self.flag_time_offset:
@@ -378,7 +378,7 @@ class smi2ass(AssStyle):
                             )
                         except:  # Failed to convert
                             convt_line = tmp_color.text
-                            print(f"Failed to convert color name: {smi_col}")
+                            self.log(f"Failed to convert color name: {smi_col}")
 
                     # Update with converted line
                     tmp_color.replaceWith(convt_line)
@@ -443,7 +443,7 @@ class smi2ass(AssStyle):
 
         # If class was not initialized print error message.
         if not self.flag_preprocess:
-            print(
+            self.log(
                 "Initialization  process is not completed\n"
                 + 'Please Initialize class by calling "update_file2conv" method'
             )
@@ -468,7 +468,7 @@ class smi2ass(AssStyle):
             suffix = f"-{language.upper()}" if multiple_languages else ""
             ass_path = output_dir / f"{self.path2smi.stem}{suffix}.ass"
             save_internal(ass_path, lines)
-            print(f"Converted file has been saved as... {ass_path}")
+            self.log(f"Converted file has been saved as... {ass_path}")
 
 
 def rgb2bgr(rgb: str) -> str:

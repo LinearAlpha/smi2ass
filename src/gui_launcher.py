@@ -16,7 +16,10 @@ def main(argv=None):
         from PySide6.QtWidgets import QApplication
         from .gui import MainWindow, STYLESHEET
     except ImportError as error:
-        print('The GUI requires Qt. Install it with: python -m pip install "smi2ass[gui]"', file=sys.stderr)
+        if isinstance(error, ModuleNotFoundError) and (error.name or "").startswith("PySide6"):
+            print('The GUI requires Qt. Install it with: python -m pip install "smi2ass[gui]"', file=sys.stderr)
+        else:
+            print("Could not load the desktop interface. See the GUI prerequisites in README.md.", file=sys.stderr)
         print(error, file=sys.stderr)
         return 1
     app = QApplication([sys.argv[0]])

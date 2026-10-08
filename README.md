@@ -118,6 +118,13 @@ smi2ass-gui
 
 You can also use `python -m smi2ass.gui` or `smi2ass-gui "Episode 01.smi"`. The existing CLI installation and commands remain available.
 
+On Ubuntu, install Qt's graphics and X11 runtime libraries before running or building the GUI (a desktop session is required to use the window):
+
+```shell
+sudo apt-get update
+sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0
+```
+
 - **Convert:** add files, drag and drop `.smi`/`.sami` files, or add a folder (including subfolders). Select files, choose an output folder and preset, and optionally set a signed timing offset in milliseconds. Conversion runs in the background; Cancel stops after the current file. Hover over an Error status for details.
 - **ASS Settings:** edit font, emphasis, four colors and their opacity, outline/shadow, alignment, margins, and canvas size. Advanced style options include scaling, spacing, rotation, encoding, title, timer, and script options. The illustrative preview updates immediately; final rendering depends on your video player and installed fonts. Inline SAMI styling can override the base style.
 - **Presets:** Apply to conversion saves the current settings for future sessions. Save preset also creates a named preset. Import/Export settings uses the same JSON format as `ass_styles.json`, so an exported file can be used with the CLI's `--settings-dir` alongside `lan_code.json`. GUI preferences are stored in the current user's application configuration directory.
@@ -146,7 +153,7 @@ python -m unittest discover -s src/test -v
 python scripts/smoke_test.py
 ```
 
-CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Ubuntu 26.04**. It also builds and tests wheel/source installations in fresh environments, compiles Linux/Windows executables with Python 3.14 (Linux builds use Ubuntu 26.04), and tests both extracted archive formats outside the checkout.
+CI runs the regression tests and installed CLI smoke tests on **Python 3.11–3.14, Windows and Ubuntu 26.04**, plus desktop GUI tests on Python 3.14. It also tests fresh wheel/source CLI and GUI installations, compiles Linux/Windows executables with Python 3.14 (Linux builds use Ubuntu 26.04), and tests both extracted archive formats outside the checkout.
 
 ## Build distributions
 
@@ -162,7 +169,7 @@ For a complete local build, install **Python 3.14 x86-64** and a native C compil
 .\build.ps1
 ```
 
-The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the executable for your OS. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
+The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the CLI and GUI executables for your OS. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
 
 To run the same steps manually with a Python 3.14 virtual environment active:
 

@@ -9,7 +9,7 @@ import webcolors
 
 
 class AssStyle:
-    def __init__(self, setting_path: str = "") -> None:
+    def __init__(self, setting_path: str = "", verbose: bool = True) -> None:
         """Reads setting JSON file form local drive and compose into ASS
         header block. Also, reads language code and color code setting from
         JSON file from local drive that can convert SMI to ASS style code.
@@ -20,6 +20,7 @@ class AssStyle:
         """
 
         # Save input path
+        self.verbose = verbose
         self.setting_path: Path
         if setting_path == "":
             self.setting_path = Path(__file__).resolve().parent / "setting"
@@ -111,11 +112,21 @@ class AssStyle:
         try:
             return self.lan_code[tmp_lang_code.upper()]
         except:
-            print(
+            self.log(
                 'Language code "%s" is not found, please add language code to "%s"'
                 % (tmp_lang_code, "lan_code.json")
             )
             return self.lan_code["UNKNOWNCC"]
+
+    def log(self, message: str) -> None:
+        """Keep diagnostics optional and usable on legacy Windows consoles."""
+        if not self.verbose:
+            return
+        try:
+            print(message)
+        except UnicodeEncodeError:
+            encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+            print(message.encode(encoding, errors="backslashreplace").decode(encoding))
 
     def color2hex(self, str_color: str) -> str:
         return webcolors.name_to_hex(str_color).lstrip('#') # it can get rid of '#' in front of the hex code
@@ -215,3 +226,4 @@ def is_nuitka() -> bool:
     flag2: bool = "NUITKA_ONEFILE_PARENT" in os.environ
 
     return flag1 or flag2
+

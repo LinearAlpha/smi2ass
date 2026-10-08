@@ -1,4 +1,6 @@
 from copy import deepcopy
+import contextlib
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -15,6 +17,20 @@ def sample(text="Hello", language="ENCC"):
 
 
 class GuiCoreTest(unittest.TestCase):
+    def test_unicode_paths_work_with_legacy_console_encoding(self):
+        from smi2ass import smi2ass
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"한글.smi"
+            path.write_text(sample(),encoding="utf-8")
+            console = io.TextIOWrapper(io.BytesIO(),encoding="cp1252")
+            with contextlib.redirect_stdout(console):
+                source = inspect_source(path)
+                self.assertFalse(source.error)
+                self.assertFalse(prepare_source(source,default_settings()).error)
+                self.assertEqual(0,console.tell())
+                smi2ass(str(path)).to_ass().save(Path(directory)/"output")
+            self.assertIn("Hello",(Path(directory)/"output"/"한글.ass").read_text(encoding="utf-8"))
+
     def test_colors_use_ass_bgr_and_inverted_alpha(self):
         self.assertEqual("&H000000FF", rgb_to_color("#FF0000",100))
         self.assertEqual("&H8000FF00", rgb_to_color("#00FF00",50))

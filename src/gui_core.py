@@ -133,7 +133,7 @@ class Source:
 def inspect_source(path):
     path = Path(path).resolve()
     try:
-        converter = smi2ass(str(path))
+        converter = smi2ass(str(path), verbose=False)
         return Source(path, tuple(converter.smi_lines), converter.encoding or "Unknown")
     except (OSError, ValueError, IndexError, TypeError) as error:
         return Source(path, error=str(error))
@@ -148,7 +148,7 @@ class Prepared:
 
 def prepare_source(source, settings, offset=0):
     try:
-        converter = smi2ass()
+        converter = smi2ass(verbose=False)
         converter.ass_style = validate_settings(settings)
         converter.set_time_offset(offset)
         converter.to_ass(str(source.path))

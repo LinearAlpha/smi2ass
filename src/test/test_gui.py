@@ -1,4 +1,5 @@
 from copy import deepcopy
+from importlib.util import find_spec
 import os
 from pathlib import Path
 import tempfile
@@ -7,14 +8,12 @@ import unittest
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
-try:
+QT_AVAILABLE = find_spec("PySide6") is not None
+if QT_AVAILABLE:
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
     from smi2ass.gui import MainWindow, STYLESHEET
     from smi2ass.gui_core import PresetStore
-    QT_AVAILABLE = True
-except ImportError:
-    QT_AVAILABLE = False
 
 
 @unittest.skipUnless(QT_AVAILABLE,"GUI extra not installed")
@@ -112,6 +111,19 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual("Error",self.window.table.item(0,3).text())
         self.assertFalse(self.window.convert_button.isEnabled())
         self.assertTrue(self.window.table.item(0,3).toolTip())
+
+    def test_json_export_and_import_restore_editor_settings(self):
+        path = self.root/"ass_styles.json"
+        editor = self.window.editor
+        editor.controls[("style","Fontsize")].setValue(48)
+        expected = deepcopy(editor.settings)
+        with patch.object(QFileDialog,"getSaveFileName",return_value=(str(path),"")):
+            self.window.export_settings()
+        editor.set_settings(self.window.active)
+        with patch.object(QFileDialog,"getOpenFileName",return_value=(str(path),"")):
+            self.window.import_settings()
+        self.assertEqual(expected,editor.settings)
+        self.assertEqual(64,self.window.active["style"]["Fontsize"])
 
 
 if __name__ == "__main__":
