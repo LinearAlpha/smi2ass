@@ -11,7 +11,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def check_distribution(artifact, gui=False):
-    """Install this exact artifact in a fresh venv and test its declared entry points."""
+    """Install the exact artifact and verify its declared entry points.
+
+    Args:
+        artifact (Path): Exact wheel or source archive to install.
+        gui (bool): Whether to install the GUI extra and run desktop checks. Defaults to
+            False.
+
+    Raises:
+        subprocess.CalledProcessError: Installation, dependency checks, or smoke tests
+            fail.
+        OSError: The temporary environment cannot be created or launched.
+    """
     # Do not expose the calling checkout or another Python installation to the
     # temporary interpreter or the generated console entry point.
     env = {key: value for key, value in os.environ.items()
@@ -43,6 +54,13 @@ def check_distribution(artifact, gui=False):
 
 
 def main():
+    """Verify the wheel and source distribution currently present in dist.
+
+    Raises:
+        RuntimeError: The distribution count is not exactly two.
+        subprocess.CalledProcessError: A distribution fails installation or
+            verification.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--gui", action="store_true", help="Also install and exercise the optional desktop GUI")
     args = parser.parse_args()

@@ -22,14 +22,23 @@ if QT_AVAILABLE:
 
 @unittest.skipUnless(QT_AVAILABLE,"GUI extra not installed")
 class DesktopTest(unittest.TestCase):
-    """Use one QApplication with disposable window preferences for every test."""
+    """Use one QApplication with disposable window preferences for every test.
+
+    Attributes:
+        app (QApplication): Shared offscreen application for this test class.
+        root (Path): Temporary directory for per-test inputs and preferences.
+        window (MainWindow): Fresh desktop window under test.
+        errors (list[str]): Warnings captured instead of opening modal dialogs.
+    """
 
     @classmethod
     def setUpClass(cls):
+        """Create or reuse the single Qt application and apply the default theme."""
         cls.app = QApplication.instance() or QApplication([])
         apply_theme(cls.app)
 
     def setUp(self):
+        """Open a fresh window with isolated preferences and captured warnings."""
         self.directory = tempfile.TemporaryDirectory()
         self.root = Path(self.directory.name)
         self.window = MainWindow(self.root/"gui.json")
@@ -39,7 +48,12 @@ class DesktopTest(unittest.TestCase):
         self.window.show_error = self.errors.append
 
     def wait_idle(self):
-        """Pump queued worker signals until both the operation and QThread lifetimes end."""
+        """Pump worker signals until the operation and QThread lifetimes end.
+
+        Raises:
+            AssertionError: A worker exceeds the deadline or the window reports
+                warnings.
+        """
         deadline = time.monotonic()+10
         while self.window.busy or self.window.jobs:
             self.app.processEvents()
@@ -50,6 +64,7 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual([],self.errors)
 
     def tearDown(self):
+        """Drain worker signals, close the window, and remove temporary files."""
         self.wait_idle()
         self.window.closing = True
         self.window.close()
@@ -57,7 +72,15 @@ class DesktopTest(unittest.TestCase):
         self.directory.cleanup()
 
     def add_source(self, folder="", name="sample.smi"):
-        """Queue a minimal real file and wait for its asynchronous inspection."""
+        """Queue a minimal real file and wait for its asynchronous inspection.
+
+        Args:
+            folder (str): Optional subfolder within the test directory.
+            name (str): SAMI filename. Defaults to sample.smi.
+
+        Returns:
+            Path: Created input path after its queue inspection completes.
+        """
         path = self.root/folder/name
         path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text("<SAMI><BODY><SYNC Start=1000><P Class=ENCC>Hello<SYNC Start=2000><P Class=ENCC>&nbsp;</BODY></SAMI>",encoding="utf-8")
@@ -66,6 +89,7 @@ class DesktopTest(unittest.TestCase):
         return path
 
     def test_theme_overrides_inherited_dark_palette(self):
+        """Verify explicit light theme colors replace an inherited dark Qt palette."""
         dark = QPalette(self.app.palette())
         dark.setColor(QPalette.ColorRole.Window, QColor("#000000"))
         dark.setColor(QPalette.ColorRole.Base, QColor("#000000"))
@@ -79,6 +103,7 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual("#26343c", palette.color(QPalette.ColorRole.Text).name())
 
     def test_dark_theme_switch_persists_without_changing_ass_settings(self):
+        """Verify theme persistence is independent of subtitle styles."""
         original = deepcopy(self.window.active)
         self.window.theme_selector.setCurrentIndex(1)
         self.app.processEvents()
@@ -94,6 +119,7 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual("light", PresetStore(self.root/"gui.json").theme)
 
     def test_settings_apply_persist_and_preview_without_modifying_draft(self):
+        """Verify preview edits precede style application and persistence."""
         editor = self.window.editor
         editor.controls[("style","Name")].setText("Cinema")
         editor.controls[("style","Outline")].setValue(2)
@@ -106,6 +132,7 @@ class DesktopTest(unittest.TestCase):
         self.assertFalse(editor.preview.grab().isNull())
 
     def test_selected_rows_convert_and_existing_output_requires_confirmation(self):
+        """Verify row selection and confirmed replacement of existing output."""
         self.add_source(name="first.smi")
         self.add_source(name="second.smi")
         self.window.table.item(1,0).setCheckState(Qt.CheckState.Unchecked)
@@ -127,6 +154,7 @@ class DesktopTest(unittest.TestCase):
         self.assertIn("Hello",path.read_text(encoding="utf-8"))
 
     def test_duplicate_output_names_are_blocked_and_cancel_writes_nothing(self):
+        """Verify duplicate names and cancelled preparation do not create output files."""
         self.add_source("a")
         self.add_source("b")
         self.window.output.setText(str(self.root/"output"))
@@ -141,6 +169,7 @@ class DesktopTest(unittest.TestCase):
         self.assertIn("Cancelled",self.window.status.text())
 
     def test_failed_input_stays_visible_and_is_not_selectable(self):
+        """Verify unusable input stays visible and cannot be converted."""
         path = self.root/"broken.smi"
         path.write_text("not subtitles",encoding="utf-8")
         self.window.add_paths([str(path)])
@@ -150,6 +179,7 @@ class DesktopTest(unittest.TestCase):
         self.assertTrue(self.window.table.item(0,3).toolTip())
 
     def test_json_export_and_import_restore_editor_settings(self):
+        """Verify JSON round trips restore the draft without applying it to conversion."""
         path = self.root/"ass_styles.json"
         editor = self.window.editor
         editor.controls[("style","Fontsize")].setValue(48)

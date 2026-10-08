@@ -23,9 +23,10 @@ finally:
 
 
 class BuildTargetTest(unittest.TestCase):
-    """Inspect compiler commands and real archives without running native compilation."""
+    """Check compiler commands and archives without native compilation."""
 
     def test_cli_and_gui_builds_are_separate(self):
+        """Verify CPU flags, Qt handling, target names, and separate outputs."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "src" / "setting").mkdir(parents=True)
@@ -52,6 +53,7 @@ class BuildTargetTest(unittest.TestCase):
 
     @unittest.skipUnless(find_spec("py7zr"), "Install py7zr to test native archives")
     def test_archives_contain_only_the_corresponding_program_and_verify_both_formats(self):
+        """Verify ZIP/7z extraction isolates targets and dispatches smoke checks."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):
@@ -64,6 +66,13 @@ class BuildTargetTest(unittest.TestCase):
             seen = []
 
             def verify(target, binary):
+                """Validate an extracted fake executable and record its target/format pair.
+
+                Args:
+                    target (str): Target expected in the extracted archive.
+                    binary (Path): Extracted fake executable whose contents identify its
+                        target.
+                """
                 # Fake executable contents identify the target after actual ZIP/7z extraction.
                 self.assertEqual(target, binary.read_text())
                 self.assertEqual(build_common.executable_name(target), binary.name)
@@ -88,9 +97,10 @@ class BuildTargetTest(unittest.TestCase):
 
 
 class CleanProjectTest(unittest.TestCase):
-    """Model generated and preserved files in temporary roots before exercising cleanup."""
+    """Exercise cleanup with generated and preserved temporary fixtures."""
 
     def test_clean_removes_generated_files_and_preserves_source_settings_and_venvs(self):
+        """Verify cleanup deletes only generated entries and is harmless when repeated."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             generated = ["build/gui/smi2ass-gui", "dist/smi2ass.whl", "release-assets/archive.zip",
@@ -116,6 +126,7 @@ class CleanProjectTest(unittest.TestCase):
             self.assertEqual([], clean_project.clean_project(root))
 
     def test_clean_does_not_follow_links_to_files_outside_the_project(self):
+        """Verify generated links are removed without touching external sentinel files."""
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             root = base / "project"

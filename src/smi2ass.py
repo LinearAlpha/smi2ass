@@ -20,10 +20,32 @@ else:  # Retain direct source execution.
 
 
 class smi2ass(AssStyle):
-    """Reuse style/offset settings across inputs while keeping each file's cues separate."""
+    """Reuse styles and offsets while keeping each input's cues separate.
+
+    Attributes:
+        path2smi (Path): Current input path, available after preprocessing starts.
+        smi_lines (dict): Language tracks of parsed sync blocks, ASS starts, and
+            milliseconds.
+        ass_lines (dict[str, list[str]]): Converted headers and Dialogue rows grouped by
+            language.
+        flag_preprocess (bool): Whether the current input finished preprocessing.
+        flag_time_offset (bool): Whether subsequent preprocessing applies the configured
+            offset.
+        time_offset (int): Milliseconds added to valid cue starts.
+    """
 
     def __init__(self, smi_path: str = "", **kwargs) -> None:
-        """Load settings immediately and optionally preprocess an initial SAMI file."""
+        """Load settings immediately and optionally preprocess an initial SAMI file.
+
+        Args:
+            smi_path (str): Optional initial SAMI path. An empty string delays
+                preprocessing.
+            **kwargs (object): AssStyle options such as setting_path and verbose.
+
+        Raises:
+            OSError: Settings or an initial subtitle file cannot be read.
+            ValueError: The initial subtitle file has no valid cues.
+        """
 
         # Initializing parent class
         super().__init__(**kwargs)
@@ -47,7 +69,15 @@ class smi2ass(AssStyle):
             self.__preprocess(smi_path)
 
     def __preprocess(self, smi_file_input: str) -> None:
-        """Reset per-file state, decode input, and extract language/timestamp groups."""
+        """Reset per-file state, decode input, and extract language/timestamp groups.
+
+        Args:
+            smi_file_input (str): SAMI file to decode and group into language tracks.
+
+        Raises:
+            OSError: The input file cannot be read.
+            ValueError: No valid cue starts remain after applying the offset.
+        """
 
         self.path2smi = Path(smi_file_input)  # Saving input path
         # A reused converter must not carry languages or output text from the previous file.
@@ -87,7 +117,7 @@ class smi2ass(AssStyle):
         self.flag_preprocess = True
 
     def __convert_whitespace(self) -> None:
-        """Legacy whitespace pass; its unassigned replacements currently leave text intact."""
+        """Run the legacy whitespace pass, which currently leaves text intact."""
 
         # TODO: assign str.replace results when deliberately changing normalization behavior.
         whitespace: list[str] = ["\u000D\u000A", "\u000A", "\u000D"]
@@ -157,13 +187,13 @@ class smi2ass(AssStyle):
         )
 
     def __ms2timestamp(self, ms: int) -> str:
-        """Converting millisecond to h:mm:ss.ff time format
+        """Round milliseconds into an ASS h:mm:ss.cc timestamp.
 
         Args:
-            ms (int): Time in millisecond
+            ms (int): Cue time in milliseconds.
 
         Returns:
-            str: Converted time stamp
+            str: Timestamp rounded to centiseconds, including unit carry.
         """
 
         # Round before splitting units so 995 ms carries into the next second.
@@ -174,7 +204,11 @@ class smi2ass(AssStyle):
         return "%01d:%02d:%02d.%02d" % (hours, minutes, seconds, centiseconds)
 
     def __time_lan(self) -> None:
-        """Group valid sync blocks by normalized language, applying offsets in milliseconds."""
+        """Group valid cues by normalized language and apply timing offsets.
+
+        Raises:
+            ValueError: No valid subtitle cues remain after timestamp validation.
+        """
 
         tmp_lines: dict[str, list[any]] = defaultdict(list)
         time_code: int  # Prepare valuable to hold time in ms.
@@ -254,12 +288,13 @@ class smi2ass(AssStyle):
         self.smi_lines = tmp_lines
 
     def __tag_conv(self, tags: list[any], conv_rule: str) -> None:
-        """Converting SMI tags to ASS format based on input rule
+        """Replace matching SAMI tags with an ASS override template.
 
         Args:
-            tags (list[any]): SMI tags that is found in line.
-            conv_rule (str): Conversion rule that in C string format. It must
-            only include one string position. (e.g "example %s test")
+            tags (list[bs4.element.Tag]): Parsed tags to replace in place; empty tags
+                are removed.
+            conv_rule (str): Percent-format template containing one %s slot for the tag
+                text. Example: "{\\b1}%s{\\b0}".
         """
 
         for tmp_tag in tags:
@@ -269,7 +304,15 @@ class smi2ass(AssStyle):
                 tmp_tag.extract()
 
     def __core(self, lines2conv: list[list[any]]) -> list[str]:
-        """Render one language track; inline tag replacement consumes its parsed blocks."""
+        """Render one language track, consuming its parsed inline tags.
+
+        Args:
+            lines2conv (list[list[object]]): Rows containing a parsed sync block, ASS
+                start, and millisecond start.
+
+        Returns:
+            list[str]: ASS header followed by visible Dialogue records for one language.
+        """
         # Setting first item to be ASS style header
         tmp_ass_lines: list[str] = [self.ass_header()]
 
@@ -376,19 +419,48 @@ class smi2ass(AssStyle):
         return tmp_ass_lines
 
     def update_file2conv(self, smi_path: str) -> Self:
-        """Load a new input, retaining style/offset settings, and return self for chaining."""
+        """Load a new input while retaining style and offset settings.
+
+        Args:
+            smi_path (str): New input path to preprocess using the current style and
+                offset.
+
+        Returns:
+            Self: This converter with its per-file state replaced.
+
+        Raises:
+            OSError: The new input cannot be read.
+            ValueError: The new input contains no valid cues.
+        """
 
         self.__preprocess(smi_path)
 
         return self
 
     def set_time_offset(self, offset: int) -> None:
-        """Set a millisecond offset for subsequent preprocessing; negative values advance cues."""
+        """Set the millisecond offset applied to subsequently loaded cues.
+
+        Args:
+            offset (int): Milliseconds to add to subsequently loaded cues; negative
+                values advance them.
+        """
         self.flag_time_offset = True
         self.time_offset = offset
 
     def to_ass(self, smi_path: str = "") -> Self:
-        """Convert the loaded input or load a new path, then return self for save chaining."""
+        """Convert a loaded or replacement input and allow save chaining.
+
+        Args:
+            smi_path (str): Optional replacement input path. An empty string uses the
+                loaded input.
+
+        Returns:
+            Self: This converter containing the converted language tracks.
+
+        Raises:
+            OSError: A replacement input cannot be read.
+            ValueError: A replacement input contains no valid cues.
+        """
 
         # If there is path input then update to new SMI file
         if smi_path != "":
@@ -407,7 +479,15 @@ class smi2ass(AssStyle):
         return self
 
     def save(self, path2save: str | Path = "") -> None:
-        """Write UTF-8 tracks beside the source, or into an explicitly selected folder."""
+        """Write UTF-8 tracks beside the source, or into an explicitly selected folder.
+
+        Args:
+            path2save (str | Path): Output directory. An empty string selects the source
+                file's directory.
+
+        Raises:
+            OSError: The output directory or an ASS file cannot be written.
+        """
 
         output_dir = self.path2smi.parent if path2save == "" else Path(path2save)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -421,22 +501,28 @@ class smi2ass(AssStyle):
 
 
 def rgb2bgr(rgb: str) -> str:
-    """Converting hex rgb color code to hex bgr color code.
-    based on ASS specs (http://www.tcax.org/docs/ass-specs.htm), font color
-    should given as long integer BGR (blue-green-red)  value.
+    """Reverse six RGB hex digits into ASS blue-green-red byte order.
 
     Args:
-        rgb (str): Hex color code input
+        rgb (str): Six RGB hex digits without a prefix.
 
     Returns:
-        str: Converted color code in BGR in hex
+        str: The same color encoded as six BGR hex digits.
     """
 
     return rgb[4:6] + rgb[2:4] + rgb[0:2]
 
 
 def save_internal(save_path: Path, lines: list[str]):
-    """Write already formatted ASS records as UTF-8 without adding extra separators."""
+    """Write formatted ASS records as UTF-8 without extra separators.
+
+    Args:
+        save_path (Path): Destination ASS file to create or replace.
+        lines (list[str]): Formatted ASS records, including their required line endings.
+
+    Raises:
+        OSError: The destination cannot be written.
+    """
 
     with open(save_path, "w", encoding="utf-8") as f:
         f.writelines(lines)

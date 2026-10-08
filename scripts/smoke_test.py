@@ -11,7 +11,15 @@ KOREAN = "안녕하세요. 오늘은 날씨가 맑습니다. 자막 변환을 �
 
 
 def sample(text: str, language: str = "ENCC") -> str:
-    """Make one visible cue followed by a blank cue that defines its end time."""
+    """Make one visible cue followed by a blank cue that defines its end time.
+
+    Args:
+        text (str): Visible subtitle text wrapped in a red font tag.
+        language (str): SAMI class for the cue. Defaults to ENCC.
+
+    Returns:
+        str: SAMI markup with a visible cue and a blank end boundary.
+    """
     return f'''<SAMI><BODY>
 <SYNC Start=1000><P Class={language}><FONT COLOR=red>{text}</FONT>
 <SYNC Start=2000><P Class={language}>&nbsp;
@@ -19,7 +27,13 @@ def sample(text: str, language: str = "ENCC") -> str:
 
 
 def main() -> None:
-    """Exercise real commands and output files from an isolated temporary working folder."""
+    """Exercise real CLI commands and output in an isolated working folder.
+
+    Raises:
+        subprocess.CalledProcessError: A CLI command exits unsuccessfully.
+        AssertionError: Version, settings, timing, or converted output differs from
+            expectations.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable")
     args = parser.parse_args()
@@ -29,7 +43,19 @@ def main() -> None:
         root = Path(directory)
 
         def run(*arguments):
-            """Capture successful output, but expose the original CLI diagnostics on failure."""
+            """Capture CLI output and expose the original diagnostics on failure.
+
+            Args:
+                *arguments (str): Arguments appended to the selected CLI command.
+
+            Returns:
+                subprocess.CompletedProcess: Successful result with captured UTF-8
+                    stdout and stderr.
+
+            Raises:
+                subprocess.CalledProcessError: The CLI fails; its captured diagnostics
+                    are printed before re-raising.
+            """
             try:
                 return subprocess.run(command + list(arguments), cwd=root, check=True,
                                       text=True, encoding="utf-8", capture_output=True)

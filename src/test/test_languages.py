@@ -8,9 +8,10 @@ from smi2ass.gui_core import default_settings, inspect_source, prepare_source
 
 
 class LanguageMappingTest(unittest.TestCase):
-    """Keep alias compatibility and CLI/GUI output naming aligned with the shared table."""
+    """Keep shared language aliases and CLI/GUI naming compatible."""
 
     def test_legacy_aliases_and_unknown_fallback_are_preserved(self):
+        """Verify historical aliases and unknown fallback keep output codes."""
         style = AssStyle(verbose=False)
         expected = {
             "KRCC": "kor", "KOCC": "kor", "KR": "kor", "KO": "kor",
@@ -26,6 +27,7 @@ class LanguageMappingTest(unittest.TestCase):
                 self.assertEqual(language, style.get_lang_code(alias.lower()))
 
     def test_iso_and_regional_aliases_are_case_insensitive(self):
+        """Verify ISO and regional class variants normalize regardless of letter case."""
         style = AssStyle(verbose=False)
         groups = {
             # Bibliographic/terminological variants intentionally share the existing output code.
@@ -51,6 +53,7 @@ class LanguageMappingTest(unittest.TestCase):
                     self.assertEqual(language, style.get_lang_code(alias.lower()))
 
     def test_new_languages_produce_distinct_cli_and_gui_outputs(self):
+        """Verify multilingual CLI and GUI conversion agree on filenames and text."""
         captions = {
             "frfrcc": ("fre", "Bonjour à tous."),
             "ESMXCC": ("spa", "¡Hola, buenos días!"),

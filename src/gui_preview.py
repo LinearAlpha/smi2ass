@@ -9,8 +9,20 @@ from .gui_core import color_to_rgb
 
 
 class StylePreview(QWidget):
-    """Paint an approximate style sample using Qt font metrics and ASS canvas coordinates."""
+    """Illustrate ASS styles using Qt font metrics and canvas coordinates.
+
+    Attributes:
+        settings (dict | None): Independent ASS settings copy; None paints only the
+            background.
+        text (str): Sample subtitle text, including optional ASS \\N line breaks.
+    """
+
     def __init__(self, parent=None):
+        """Create a preview canvas with default sample text.
+
+        Args:
+            parent (QWidget | None): Optional Qt parent widget. Defaults to None.
+        """
         super().__init__(parent)
         self.settings = None
         self.text = "Every subtitle, styled your way."
@@ -18,15 +30,31 @@ class StylePreview(QWidget):
         self.setToolTip("Illustrative preview. Final font metrics and rendering depend on your video player and installed fonts.")
 
     def set_settings(self, settings):
+        """Copy settings for the preview and schedule a repaint.
+
+        Args:
+            settings (dict): ASS ScriptInfo and style mappings to illustrate.
+        """
         # Preview ownership is separate from the editor/active settings dictionaries.
         self.settings = deepcopy(settings)
         self.update()
 
     def set_text(self, text):
+        """Replace the sample subtitle text and schedule a repaint.
+
+        Args:
+            text (str): Preview text; ASS \\N markers are treated as line breaks.
+        """
         self.text = text
         self.update()
 
     def paintEvent(self, event):
+        """Paint the background and approximate ASS style with Qt glyph paths.
+
+        Args:
+            event (QPaintEvent): Qt paint notification; drawing uses the current widget
+                size.
+        """
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         width, height = self.width(), self.height()
@@ -100,6 +128,14 @@ class StylePreview(QWidget):
         painter.rotate(-style["Angle"])
 
         def color(key):
+            """Decode a style color into Qt's RGB and opacity representation.
+
+            Args:
+                key (str): ASS style color field to read.
+
+            Returns:
+                QColor: RGB color with opacity derived from inverted ASS alpha.
+            """
             # QColor's alpha is opacity, opposite to the transparency byte stored by ASS.
             rgb, _ = color_to_rgb(style[key])
             result = QColor(rgb)

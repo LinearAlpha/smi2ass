@@ -16,7 +16,18 @@ from build_common import ROOT, archive_name, executable_name, project_version, s
 
 
 def build_info(target):
-    """Record target, commit, runtime, and dependency versions for reproducible reports."""
+    """Record target, commit, runtime, and dependencies for build reports.
+
+    Args:
+        target (str): Program whose build provenance is being recorded.
+
+    Returns:
+        dict: Version, target, commit, Python, platform, and dependency metadata.
+
+    Raises:
+        subprocess.CalledProcessError: Git or dependency metadata collection fails.
+        OSError: Project metadata or required commands cannot be accessed.
+    """
     return {
         "version": project_version(), "target": target,
         "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(
@@ -27,7 +38,15 @@ def build_info(target):
 
 
 def package_target(target):
-    """Create separate ZIP/7z archives and verify both extracted copies."""
+    """Create separate ZIP/7z archives and verify both extracted copies.
+
+    Args:
+        target (str): Built CLI or GUI program to archive.
+
+    Raises:
+        OSError: Required build outputs cannot be copied or archives cannot be written.
+        subprocess.CalledProcessError: An extracted executable fails its smoke test.
+    """
     output = ROOT / "release-assets"
     output.mkdir(exist_ok=True)
     name = archive_name(target)
@@ -64,6 +83,7 @@ def package_target(target):
 
 
 def main():
+    """Package and verify each target selected by command-line options."""
     for target in selected_targets():
         package_target(target)
 

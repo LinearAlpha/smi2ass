@@ -16,7 +16,15 @@ CLI_EXCLUSIONS = (
 
 
 def build_target(target):
-    """Compile one target, copy editable defaults beside it, and verify the result."""
+    """Compile one target, copy editable defaults beside it, and verify the result.
+
+    Args:
+        target (str): Program to compile: cli or gui.
+
+    Raises:
+        subprocess.CalledProcessError: Compilation or executable verification fails.
+        OSError: Build folders or editable settings cannot be created.
+    """
     output = ROOT / "build" / target
     output.mkdir(parents=True, exist_ok=True)
     # Python 3.14 respects CPU affinity; older interpreters use the host CPU count.
@@ -52,6 +60,11 @@ def build_target(target):
 
 
 def main():
+    """Build and verify the CLI, GUI, or both selected by command-line options.
+
+    Raises:
+        subprocess.CalledProcessError: A selected build or smoke test fails.
+    """
     # Build targets sequentially because each compiler already uses all available CPUs.
     for target in selected_targets():
         build_target(target)

@@ -98,7 +98,13 @@ except ImportError:
 
 
 def apply_theme(app, theme="light"):
-    """Apply a complete palette and matching controls independent of OS settings."""
+    """Apply a complete palette and matching controls independent of OS settings.
+
+    Args:
+        app (QApplication): Running Qt application whose global style will change.
+        theme (str): Requested theme; dark selects dark colors, otherwise light.
+            Defaults to light.
+    """
     dark = theme == "dark"
     app.setStyle("Fusion")
     app.styleHints().setColorScheme(Qt.ColorScheme.Dark if dark else Qt.ColorScheme.Light)
@@ -137,16 +143,33 @@ def apply_theme(app, theme="light"):
 
 
 class Job(QThread):
-    """Run blocking work off the UI thread and report progress through Qt signals."""
+    """Run blocking work off the UI thread and report progress through Qt signals.
+
+    Attributes:
+        work (Callable[[Job], object]): Blocking callback executed by the worker thread.
+        cancel (threading.Event): Cooperative cancellation flag checked between files.
+        update (Signal): Emits a source, status, and detail/progress payload.
+        result (Signal): Emits the callback's result after successful work.
+        error (Signal): Emits failure text if the callback raises.
+    """
+
     update = Signal(object, str, object)
     result = Signal(object)
     error = Signal(str)
 
     def __init__(self, work, cancel):
+        """Attach work and its cancellation flag before starting the thread.
+
+        Args:
+            work (Callable[[Job], object]): Callback receiving this worker for progress
+                signals.
+            cancel (threading.Event): Cancellation flag shared with the window.
+        """
         super().__init__()
         self.work, self.cancel = work, cancel
 
     def run(self):
+        """Execute work and emit its result or a caught exception message."""
         try:
             self.result.emit(self.work(self))
         except Exception as error:
@@ -154,10 +177,16 @@ class Job(QThread):
 
 
 class DropZone(QFrame):
-    """Accept local file URLs and let the window handle scanning and validation."""
+    """Accept local file URLs and let the window handle scanning and validation.
+
+    Attributes:
+        paths (Signal): Emits local dropped filesystem paths as a list.
+    """
+
     paths = Signal(list)
 
     def __init__(self):
+        """Create the themed drop area and enable local file drops."""
         super().__init__()
         self.setAcceptDrops(True)
         self.setObjectName("dropZone")
@@ -171,17 +200,44 @@ class DropZone(QFrame):
         layout.addWidget(subtitle)
 
     def dragEnterEvent(self, event):
+        """Accept a drag only when every supplied URL points to a local file.
+
+        Args:
+            event (QDragEnterEvent): Qt drag-enter event containing candidate URLs.
+        """
         if event.mimeData().hasUrls() and all(url.isLocalFile() for url in event.mimeData().urls()):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
+        """Forward dropped local paths to the window's input scanner.
+
+        Args:
+            event (QDropEvent): Accepted drop event containing local URLs.
+        """
         self.paths.emit([url.toLocalFile() for url in event.mimeData().urls()])
         event.acceptProposedAction()
 
 
 class MainWindow(QMainWindow):
-    """Coordinate the conversion queue, settings draft, and background workers."""
+    """Coordinate the conversion queue, settings draft, and background workers.
+
+    Attributes:
+        store (PresetStore): Saved styles, presets, and UI preferences.
+        active (dict): Applied settings copied independently from the editor draft.
+        sources (list[Source]): Queue metadata kept in the same order as table rows.
+        jobs (set[Job]): Workers retained until their finished signals arrive.
+        busy (bool): Whether an inspection or conversion phase is active.
+        closing (bool): Whether window closure is waiting for workers to finish.
+        cancel (threading.Event): Cancellation flag for the current worker phase.
+    """
+
     def __init__(self, config_path=None):
+        """Load preferences and assemble conversion and settings screens.
+
+        Args:
+            config_path (Path | str | None): Preferences path override. None uses Qt's
+                application config directory.
+        """
         super().__init__()
         self.setWindowTitle(f"smi2ass · {__version__}")
         self.resize(1180, 960)
@@ -226,11 +282,17 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda: self.show_error(self.store.load_error))
 
     def change_theme(self):
+        """Apply the selected global theme and persist its preference."""
         self.store.theme = self.theme_selector.currentData()
         apply_theme(QApplication.instance(), self.store.theme)
         self.persist()
 
     def make_convert_page(self):
+        """Assemble input queue, output, timing, and applied-style controls.
+
+        Returns:
+            QWidget: Conversion tab page with controls stored on this window.
+        """
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0,18,0,0)
@@ -336,6 +398,11 @@ class MainWindow(QMainWindow):
         return page
 
     def make_settings_page(self):
+        """Assemble the settings draft editor and its apply/import/export actions.
+
+        Returns:
+            QWidget: ASS Settings tab page.
+        """
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0,18,0,0)
@@ -362,10 +429,20 @@ class MainWindow(QMainWindow):
         return page
 
     def show_error(self, text):
+        """Display an operation or validation warning on the UI thread.
+
+        Args:
+            text (str): Warning message shown in a modal dialog.
+        """
         QMessageBox.warning(self,"smi2ass",text)
 
     def persist(self):
-        """Save applied settings and UI preferences; the unapplied editor draft stays separate."""
+        """Save applied settings and UI preferences independently of the draft.
+
+        Returns:
+            bool: True if preferences were saved; False after displaying a recoverable
+                error.
+        """
         self.store.active = deepcopy(self.active)
         self.store.output = self.output.text()
         self.store.open_output = self.open_output.isChecked()
@@ -377,6 +454,7 @@ class MainWindow(QMainWindow):
             return False
 
     def refresh_presets(self):
+        """Rebuild preset choices without triggering selection or replacing the draft."""
         # Refreshing choices must not trigger selection handlers or discard a draft.
         self.preset.blockSignals(True)
         self.preset.clear()
@@ -387,6 +465,11 @@ class MainWindow(QMainWindow):
         self.preset.blockSignals(False)
 
     def select_preset(self,name):
+        """Apply a named preset after any necessary draft-discard confirmation.
+
+        Args:
+            name (str): Selected preset name; unknown names leave settings unchanged.
+        """
         if name not in self.store.presets:
             return
         if self.editor.settings != self.active and not self.discard_draft():
@@ -399,12 +482,21 @@ class MainWindow(QMainWindow):
         self.refresh_summary()
 
     def discard_draft(self):
+        """Ask whether unapplied ASS settings may be discarded.
+
+        Returns:
+            bool: True only when the user chooses Discard.
+        """
         return QMessageBox.question(self,"Discard changes?","Discard the unapplied ASS settings changes?",
                                     QMessageBox.StandardButton.Discard|QMessageBox.StandardButton.Cancel,
                                     QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Discard
 
     def apply_settings(self):
-        """Validate the draft before replacing the settings used by conversion workers."""
+        """Validate the draft before replacing the settings used by conversion workers.
+
+        Returns:
+            bool: True after applying valid settings; False if draft validation fails.
+        """
         try:
             self.active = validate_settings(self.editor.settings)
         except ValueError as error:
@@ -419,12 +511,14 @@ class MainWindow(QMainWindow):
         return True
 
     def reset_settings(self):
+        """Replace the editor draft with bundled defaults after discard confirmation."""
         if self.editor.settings != self.active and not self.discard_draft():
             return
         self.editor.set_settings(default_settings())
         self.dirty.setVisible(self.editor.settings != self.active)
 
     def import_settings(self):
+        """Import validated JSON into the draft without applying it to conversion."""
         import json
         path,_ = QFileDialog.getOpenFileName(self,"Import ASS settings","","JSON settings (*.json)")
         if not path:
@@ -439,6 +533,7 @@ class MainWindow(QMainWindow):
             self.show_error(f"Could not import settings.\n{error}")
 
     def export_settings(self):
+        """Validate and export the editor draft to a user-selected JSON file."""
         try:
             settings = validate_settings(self.editor.settings)
             path,_ = QFileDialog.getSaveFileName(self,"Export ASS settings","ass_styles.json","JSON settings (*.json)")
@@ -448,6 +543,7 @@ class MainWindow(QMainWindow):
             self.show_error(f"Could not export settings.\n{error}")
 
     def save_preset(self):
+        """Save a validated draft under a chosen preset name and apply it."""
         name,ok = QInputDialog.getText(self,"Save preset","Preset name")
         name = name.strip()
         if not ok or not name:
@@ -464,10 +560,16 @@ class MainWindow(QMainWindow):
             self.show_error(str(error))
 
     def selected_sources(self):
+        """Collect checked queue entries whose inspection succeeded.
+
+        Returns:
+            list[Source]: Usable selected inputs in queue order.
+        """
         return [source for row,source in enumerate(self.sources)
                 if not source.error and self.table.item(row,0).checkState() == Qt.CheckState.Checked]
 
     def refresh_summary(self):
+        """Refresh queue counts, conversion availability, and style preview."""
         selected = self.selected_sources()
         count = len(selected)
         outputs = sum(len(source.languages) for source in selected)
@@ -480,20 +582,32 @@ class MainWindow(QMainWindow):
         self.convert_preview.set_settings(self.active)
 
     def add_files(self):
+        """Open a SAMI file picker and queue the selected input paths."""
         paths,_ = QFileDialog.getOpenFileNames(self,"Add SAMI files","","SAMI subtitles (*.smi *.sami *.SMI *.SAMI)")
         self.add_paths(paths)
 
     def add_folder(self):
+        """Choose a folder for recursive SAMI input scanning."""
         folder = QFileDialog.getExistingDirectory(self,"Add folder")
         if folder:
             self.add_paths([folder])
 
     def add_paths(self, paths):
-        """Scan files/folders off the UI thread, deduplicating resolved source paths."""
+        """Scan files/folders off the UI thread, deduplicating resolved source paths.
+
+        Args:
+            paths (Iterable[Path | str]): Files or folders to scan; duplicates and
+                unsupported files are skipped.
+        """
         if self.busy or not paths:
             return
         known = {source.path for source in self.sources}
         def inspect(job):
+            """Inspect new SAMI candidates and emit rows until done or cancelled.
+
+            Args:
+                job (Job): Worker carrying the cancellation flag and row-update signal.
+            """
             found = set()
             for raw in paths:
                 path = Path(raw)
@@ -514,11 +628,23 @@ class MainWindow(QMainWindow):
         self.start_job(inspect,self.inspection_done)
 
     def inspection_done(self, _):
+        """Leave inspection mode and show whether the queue contains files.
+
+        Args:
+            _ (None): Unused completion payload from the inspection worker.
+        """
         self.set_busy(False)
         self.status.setText("Ready" if self.sources else "No SAMI files found.")
 
     def handle_update(self,source,status,extra):
-        """Receive worker signals on the UI thread, where table widgets may be changed."""
+        """Receive worker signals on the UI thread, where table widgets may be changed.
+
+        Args:
+            source (Source): Input whose queue row is added or updated.
+            status (str): Worker status, or add when inserting a new source row.
+            extra (str | int | None): Error detail, progress count, or no extra
+                information.
+        """
         if status == "add":
             row = len(self.sources)
             self.sources.append(source)
@@ -551,6 +677,11 @@ class MainWindow(QMainWindow):
             self.progress.setValue(extra)
 
     def remove_source(self,source):
+        """Remove a source and its matching table row while the window is idle.
+
+        Args:
+            source (Source): Queue entry to remove.
+        """
         if self.busy:
             return
         row = self.sources.index(source)
@@ -561,6 +692,7 @@ class MainWindow(QMainWindow):
         self.refresh_summary()
 
     def clear_sources(self):
+        """Clear queue metadata and table rows, then refresh selection summaries."""
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         self.sources.clear()
@@ -568,11 +700,17 @@ class MainWindow(QMainWindow):
         self.refresh_summary()
 
     def browse_output(self):
+        """Choose an output directory and update the destination field."""
         folder = QFileDialog.getExistingDirectory(self,"Output folder",self.output.text())
         if folder:
             self.output.setText(folder)
 
     def set_busy(self,busy):
+        """Enable or disable editing controls for the current worker phase.
+
+        Args:
+            busy (bool): Whether background work is active.
+        """
         self.busy = busy
         self.input_panel.setEnabled(not busy)
         self.style_card.setEnabled(not busy)
@@ -583,6 +721,14 @@ class MainWindow(QMainWindow):
         self.refresh_summary()
 
     def start_job(self,work,result):
+        """Start a retained worker and connect its signals to UI-thread handlers.
+
+        Args:
+            work (Callable[[Job], object]): Background operation receiving its worker
+                instance.
+            result (Callable[[object], None]): UI-thread callback receiving the
+                operation result.
+        """
         self.cancel = threading.Event()
         self.set_busy(True)
         job = Job(work,self.cancel)
@@ -595,6 +741,11 @@ class MainWindow(QMainWindow):
         job.start()
 
     def finish_job(self,job):
+        """Release a finished worker and complete any deferred window closure.
+
+        Args:
+            job (Job): Worker whose finished signal has arrived.
+        """
         self.jobs.discard(job)
         job.deleteLater()
         if self.closing and not self.jobs:
@@ -602,17 +753,24 @@ class MainWindow(QMainWindow):
             self.close()
 
     def job_failed(self,error):
+        """Leave busy mode and report a worker failure to the user.
+
+        Args:
+            error (str): Failure message emitted by the worker.
+        """
         self.set_busy(False)
         self.status.setText("Operation failed")
         self.show_error(error)
 
     def cancel_work(self):
+        """Request cooperative cancellation after the current file finishes."""
         # Workers check this between files so an in-progress write can finish.
         self.cancel.set()
         self.cancel_button.setEnabled(False)
         self.status.setText("Cancelling after the current file…")
 
     def start_conversion(self):
+        """Snapshot selected inputs/settings and prepare outputs without writing files."""
         sources = self.selected_sources()
         if not sources or self.busy:
             return
@@ -633,6 +791,15 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         # Preparation is read-only; filesystem writes start after conflict review.
         def prepare(job):
+            """Convert selected inputs in memory and emit per-file progress.
+
+            Args:
+                job (Job): Preparation worker with progress and cancellation channels.
+
+            Returns:
+                list[Prepared]: Completed preparations, possibly partial after
+                    cancellation.
+            """
             prepared = []
             for index,source in enumerate(sources):
                 if job.cancel.is_set():
@@ -645,7 +812,12 @@ class MainWindow(QMainWindow):
         self.start_job(prepare,self.prepared_done)
 
     def prepared_done(self,prepared):
-        """Review prepared names and confirm overwrites on the UI thread."""
+        """Review prepared names and confirm overwrites on the UI thread.
+
+        Args:
+            prepared (list[Prepared]): Prepared outputs and conversion errors to review
+                before saving.
+        """
         if self.cancel.is_set() or self.closing:
             self.set_busy(False)
             self.status.setText("Cancelled · no output files written")
@@ -672,6 +844,15 @@ class MainWindow(QMainWindow):
                 return
         # Pass only the exact existing paths approved in the dialog to the writer.
         def save(job):
+            """Write reviewed outputs with only the approved overwrite paths.
+
+            Args:
+                job (Job): Save worker with progress and cancellation channels.
+
+            Returns:
+                tuple: Written paths, error messages, cancellation flag, and output
+                    folder.
+            """
             written,errors = [], [item.error for item in prepared if item.error]
             for index,item in enumerate(valid):
                 if job.cancel.is_set():
@@ -687,6 +868,12 @@ class MainWindow(QMainWindow):
         self.start_job(save,self.conversion_done)
 
     def conversion_done(self,result):
+        """Leave busy mode, summarize saved files, and optionally open their folder.
+
+        Args:
+            result (tuple): Written paths, errors, cancellation flag, and folder from
+                the save worker.
+        """
         written,errors,cancelled,folder = result
         self.set_busy(False)
         self.status.setText(f"{'Cancelled' if cancelled else 'Completed'} · {len(written)} ASS files saved" + (f" · {len(errors)} file errors (see row details)" if errors else ""))
@@ -694,6 +881,11 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def closeEvent(self,event):
+        """Confirm draft discard or defer closing until active workers finish.
+
+        Args:
+            event (QCloseEvent): Qt close request to accept or ignore.
+        """
         # Defer destruction until workers finish; destroying a running QThread is unsafe.
         if self.busy or self.jobs:
             if QMessageBox.question(self,"Cancel and close?","Cancel the current operation and close after the current file finishes?",

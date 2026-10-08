@@ -9,10 +9,28 @@ import webcolors
 
 
 class AssStyle:
-    """Own one converter's style settings, language aliases, and optional diagnostics."""
+    """Own converter style settings, language aliases, and diagnostics.
+
+    Attributes:
+        verbose (bool): Whether conversion diagnostics are printed.
+        setting_path (Path): Directory containing style and language JSON files.
+        lan_code (dict[str, str]): SAMI class aliases mapped to output language codes.
+        ass_style (dict): Mutable ScriptInfo and style sections for this instance.
+        ass_event (str): Events header matching the converter's Dialogue field order.
+    """
 
     def __init__(self, setting_path: str = "", verbose: bool = True) -> None:
-        """Load independent settings from an override, package, or compiled binary folder."""
+        """Load settings from an override, package, or compiled binary folder.
+
+        Args:
+            setting_path (str): Settings directory override. An empty string selects
+                packaged or binary-adjacent defaults.
+            verbose (bool): Whether to print diagnostics. Defaults to True.
+
+        Raises:
+            OSError: A settings file cannot be read.
+            json.JSONDecodeError: A settings file contains invalid JSON.
+        """
 
         # Save input path
         self.verbose = verbose
@@ -43,10 +61,10 @@ class AssStyle:
         )
 
     def __compose_info(self) -> str:
-        """Composing "Script Info" block of ASS header in string
+        """Compose the ASS Script Info section without mutating its settings.
 
         Returns:
-            str: Composed "Script Info" block of subtitle
+            str: Script Info header, comments, and key/value records.
         """
 
         # Read the original mapping without deleting header/comment metadata.
@@ -70,10 +88,10 @@ class AssStyle:
         return tmp_info + "\n"  # Separate this section from the following style block.
 
     def __compose_styles(self) -> str:
-        """Compose "Styles" block of ASS header in string
+        """Compose matching ASS style format and value records in field order.
 
         Returns:
-            str: Composed "Styles" block
+            str: V4+ Styles section with one Format row and one Style row.
         """
 
         # Use the same ordered keys for Format and Style so every value matches its field.
@@ -94,14 +112,13 @@ class AssStyle:
         return f"{tmp_head}\n{tmp_format}\n{tmp_style}\n\n"
 
     def get_lang_code(self, tmp_lang_code: str) -> str:
-        """Convert SMI language code to ASS language code
+        """Resolve a SAMI class alias to its shared output language code.
 
         Args:
-            tmp_lang_code (str): SMI language code in all upper case
+            tmp_lang_code (str): SAMI class alias; lookup is case-insensitive.
 
         Returns:
-            str: Matching ASS language code. in case when language code is not
-            exist, it will return "und" as unknown
+            str: Mapped language code, or the configured UNKNOWNCC fallback.
         """
 
         # Class aliases share one output language code for grouping and filename suffixes.
@@ -115,7 +132,12 @@ class AssStyle:
             return self.lan_code["UNKNOWNCC"]
 
     def log(self, message: str) -> None:
-        """Keep diagnostics optional and usable on legacy Windows consoles."""
+        """Keep diagnostics optional and usable on legacy Windows consoles.
+
+        Args:
+            message (str): Diagnostic text; unencodable characters are escaped for the
+                console.
+        """
         if not self.verbose:
             return
         try:
@@ -126,29 +148,43 @@ class AssStyle:
             print(message.encode(encoding, errors="backslashreplace").decode(encoding))
 
     def color2hex(self, str_color: str) -> str:
-        """Return six RGB hex digits without the CSS prefix, ready for BGR conversion."""
+        """Return six RGB hex digits without the CSS prefix, ready for BGR conversion.
+
+        Args:
+            str_color (str): CSS color name such as red.
+
+        Returns:
+            str: Six RGB hex digits without a leading #.
+
+        Raises:
+            ValueError: The color name is not recognized by webcolors.
+        """
         return webcolors.name_to_hex(str_color).lstrip('#')
 
     def update_title(self, title: str) -> None:
-        """Update title value in the Script Info block
+        """Set the title used in the ASS Script Info section.
 
         Args:
-            title (str): Name of Video file that where subtitle will be used
+            title (str): Subtitle/video title to write into the header.
         """
 
         self.ass_style["ScriptInfo"]["Title"] = title
 
     @property
     def title(self) -> str:
+        """Read the current ASS script title.
+
+        Returns:
+            str: Configured Title value.
+        """
         return self.ass_style["ScriptInfo"]["Title"]
 
     def update_res(self, res_x: int, res_y: int) -> None:
-        """To update resolution information of the video. It is default to
-        FullHD (1920 x 1080) resolution in the json file
+        """Set both dimensions of the ASS script canvas.
 
         Args:
-            res_x (int): Horizontal size of the screen
-            res_y (int): Vertical size of the screen
+            res_x (int): Horizontal canvas size in pixels.
+            res_y (int): Vertical canvas size in pixels.
         """
 
         self.ass_style["ScriptInfo"]["PlayResX"] = res_x
@@ -156,49 +192,76 @@ class AssStyle:
 
     @property
     def resolution(self) -> list[int]:
+        """Read the current ASS canvas dimensions.
+
+        Returns:
+            list[int]: Horizontal and vertical pixel dimensions, in that order.
+        """
         return [
             self.ass_style["ScriptInfo"]["PlayResX"],
             self.ass_style["ScriptInfo"]["PlayResY"],
         ]
 
     def update_font_name(self, name: str) -> None:
-        """Updating font of subtitle
+        """Set the base font used by the ASS style.
 
         Args:
-            name (str): Name of the Font
+            name (str): Font family name expected by the subtitle renderer.
         """
 
         self.ass_style["style"]["Fontname"] = name
 
     @property
     def font_name(self) -> str:
+        """Read the current base font family.
+
+        Returns:
+            str: Configured Fontname value.
+        """
         return self.ass_style["style"]["Fontname"]
 
     def update_font_size(self, size: int | float) -> None:
-        """Updating font size of subtitle
+        """Set the base font size used by the ASS style.
 
         Args:
-            size (int | float): Size of font
+            size (int | float): Font size in ASS script coordinates.
         """
 
         self.ass_style["style"]["Fontsize"] = size
 
     @property
     def font_size(self) -> int | float:
+        """Read the current base font size.
+
+        Returns:
+            int | float: Configured Fontsize value.
+        """
         return self.ass_style["style"]["Fontsize"]
 
     def ass_header(self) -> str:
-        """Composing ASS header that contains ASS style settings
+        """Combine script information, style records, and the event schema.
 
         Returns:
-            str: Composed ASS header in string format
+            str: Complete ASS header ready to precede Dialogue records.
         """
 
         return self.__compose_info() + self.__compose_styles() + self.ass_event
 
 
 def load_setting(fs_name: str, fs_path: Path | str) -> dict[str, any]:
-    """Read a fresh UTF-8 JSON mapping so converter instances do not share mutations."""
+    """Read fresh UTF-8 JSON settings without sharing mutable mappings.
+
+    Args:
+        fs_name (str): JSON filename within the settings directory.
+        fs_path (Path | str): Directory containing the requested JSON file.
+
+    Returns:
+        dict: Newly decoded settings mapping owned by the caller.
+
+    Raises:
+        OSError: The JSON file cannot be read.
+        json.JSONDecodeError: The JSON file is malformed.
+    """
 
     file2open = Path(fs_path) / fs_name
     with open(file2open, "r", encoding="utf-8") as f:
@@ -206,10 +269,10 @@ def load_setting(fs_name: str, fs_path: Path | str) -> dict[str, any]:
 
 
 def is_nuitka() -> bool:
-    """Check if the script is compiled with Nuitka
+    """Detect Nuitka compilation or a onefile child process.
 
     Returns:
-        bool: True, if compiled with Nuitka
+        bool: Whether compiled-runtime markers are present.
     """
 
     # Nuitka exposes a compiled marker; onefile children also inherit the parent marker.

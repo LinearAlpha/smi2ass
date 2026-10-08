@@ -12,12 +12,27 @@ from .smi2ass import smi2ass
 
 
 def default_settings():
-    """Return an independent copy of the bundled ASS configuration."""
+    """Return an independent copy of the bundled ASS configuration.
+
+    Returns:
+        dict: Independent ScriptInfo and style mappings loaded from bundled defaults.
+    """
     return deepcopy(AssStyle().ass_style)
 
 
 def validate_settings(value):
-    """Return a complete, ordered ASS configuration or reject invalid imports."""
+    """Return a complete, ordered ASS configuration or reject invalid imports.
+
+    Args:
+        value (dict): Imported ScriptInfo and style sections; missing fields use
+            defaults.
+
+    Returns:
+        dict: Validated copy with canonical section headers and serialization order.
+
+    Raises:
+        ValueError: Sections, field values, or ASS-safe text are invalid.
+    """
     # Start with defaults so style fields retain the converter's serialization order.
     defaults = default_settings()
     if not isinstance(value, dict):
@@ -78,13 +93,34 @@ def validate_settings(value):
 
 
 def color_to_rgb(value):
-    """Decode ASS AABBGGRR into an RGB hex color and a 0–100 opacity value."""
+    """Decode ASS AABBGGRR into an RGB hex color and a 0–100 opacity value.
+
+    Args:
+        value (str): ASS color in &HAABBGGRR format.
+
+    Returns:
+        tuple[str, int]: RGB color as #RRGGBB and opacity from 0 to 100.
+
+    Raises:
+        ValueError: A color byte cannot be decoded as hexadecimal.
+    """
     alpha, blue, green, red = (int(value[index:index + 2], 16) for index in (2, 4, 6, 8))
     return f"#{red:02X}{green:02X}{blue:02X}", round((255 - alpha) * 100 / 255)
 
 
 def rgb_to_color(rgb, opacity):
-    """Encode RGB and opacity as ASS AABBGGRR (alpha 0 means fully opaque)."""
+    """Encode RGB and opacity as ASS AABBGGRR (alpha 0 means fully opaque).
+
+    Args:
+        rgb (str): RGB color in #RRGGBB format.
+        opacity (int | float): Opacity from 0 (transparent) to 100 (opaque).
+
+    Returns:
+        str: Uppercase ASS &HAABBGGRR color with inverted alpha.
+
+    Raises:
+        ValueError: The RGB format or opacity range is invalid.
+    """
     if not re.fullmatch(r"#[0-9a-fA-F]{6}", rgb) or not 0 <= opacity <= 100:
         raise ValueError("Invalid color or opacity.")
     alpha = round(255 * (1 - opacity / 100))
@@ -92,7 +128,16 @@ def rgb_to_color(rgb, opacity):
 
 
 def write_json(path, value):
-    """Write UTF-8 JSON through a temporary sibling and atomic replacement."""
+    """Write UTF-8 JSON through a temporary sibling and atomic replacement.
+
+    Args:
+        path (Path | str): JSON destination; missing parent directories are created.
+        value (object): JSON-serializable data to write as UTF-8.
+
+    Raises:
+        OSError: The temporary file or destination cannot be written/replaced.
+        TypeError: The supplied value cannot be serialized as JSON.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # A sibling keeps replacement on the same filesystem; close it first on Windows.
@@ -107,8 +152,26 @@ def write_json(path, value):
 
 
 class PresetStore:
-    """Persist applied styles, named presets, and UI preferences in one JSON file."""
+    """Persist applied styles, named presets, and UI preferences in one JSON file.
+
+    Attributes:
+        path (Path): Preferences JSON file.
+        active (dict): Last applied ASS settings.
+        presets (dict[str, dict]): Named settings copies, including the bundled Default
+            preset.
+        output (str): Last selected output directory.
+        open_output (bool): Whether conversion should open the output folder.
+        theme (str): Saved light or dark theme preference.
+        load_error (str): Recoverable preferences error, or an empty string after a
+            successful load.
+    """
+
     def __init__(self, path):
+        """Load preferences and recover default styles after supported errors.
+
+        Args:
+            path (Path | str): Preferences JSON path; absence starts with defaults.
+        """
         self.path = Path(path)
         self.active = default_settings()
         self.presets = {"Default": deepcopy(self.active)}
@@ -131,13 +194,27 @@ class PresetStore:
                 self.load_error = f"Saved settings could not be loaded. Defaults are in use.\n{error}"
 
     def save(self):
+        """Validate applied settings and atomically persist the current preferences.
+
+        Raises:
+            ValueError: Applied ASS settings are invalid.
+            OSError: The preferences file cannot be written.
+        """
         write_json(self.path, {"active": validate_settings(self.active), "presets": self.presets,
                               "output": self.output, "open_output": self.open_output, "theme": self.theme})
 
 
 @dataclass
 class Source:
-    """Queue metadata shared between worker threads and the desktop window."""
+    """Queue metadata shared between worker threads and the desktop window.
+
+    Attributes:
+        path (Path): Resolved SAMI input path.
+        languages (tuple[str, ...]): Detected normalized language codes.
+        encoding (str): Detected input encoding, or Unknown when unavailable.
+        error (str): Inspection failure text; empty for usable input.
+    """
+
     path: Path
     languages: tuple[str, ...] = ()
     encoding: str = ""
@@ -145,7 +222,14 @@ class Source:
 
 
 def inspect_source(path):
-    """Detect encoding and language groups without creating output files."""
+    """Detect encoding and language groups without creating output files.
+
+    Args:
+        path (Path | str): SAMI input path to inspect.
+
+    Returns:
+        Source: Queue metadata, with supported inspection failures stored in error.
+    """
     path = Path(path).resolve()
     try:
         converter = smi2ass(str(path), verbose=False)
@@ -156,14 +240,30 @@ def inspect_source(path):
 
 @dataclass
 class Prepared:
-    """Hold ASS text in memory until conflicts and overwrites have been reviewed."""
+    """Hold ASS text in memory until conflicts and overwrites have been reviewed.
+
+    Attributes:
+        source (Source): Input metadata associated with this conversion.
+        outputs (dict[str, str]): Output filenames mapped to complete ASS text.
+        error (str): Conversion failure text; empty when preparation succeeds.
+    """
+
     source: Source
     outputs: dict[str, str] = field(default_factory=dict)
     error: str = ""
 
 
 def prepare_source(source, settings, offset=0):
-    """Convert one input into filename/text pairs, retaining errors on its queue row."""
+    """Prepare filename/text pairs and retain conversion errors on the row.
+
+    Args:
+        source (Source): Inspected input to convert.
+        settings (dict): ASS configuration validated before conversion.
+        offset (int): Milliseconds added to cue starts. Defaults to zero.
+
+    Returns:
+        Prepared: In-memory outputs, or an error record without written files.
+    """
     try:
         converter = smi2ass(verbose=False)
         converter.ass_style = validate_settings(settings)
@@ -182,7 +282,16 @@ def prepare_source(source, settings, offset=0):
 
 
 def conflicting_names(prepared):
-    """Find duplicate output names, including collisions on case-insensitive filesystems."""
+    """Find output name collisions across case-insensitive filesystems.
+
+    Args:
+        prepared (Iterable[Prepared]): Prepared conversions whose output names share one
+            folder.
+
+    Returns:
+        dict[str, list[Path]]: Case-folded duplicate filenames mapped to their source
+            owners.
+    """
     owners = {}
     for item in prepared:
         for filename in item.outputs:
@@ -191,7 +300,23 @@ def conflicting_names(prepared):
 
 
 def write_prepared(item, folder, overwrite=()):
-    """Never replace an existing file unless its exact path was approved."""
+    """Never replace an existing file unless its exact path was approved.
+
+    Writes occur one file at a time. A later failure does not roll back earlier outputs.
+
+    Args:
+        item (Prepared): Prepared filename/text pairs to write.
+        folder (Path | str): Destination directory; created if missing.
+        overwrite (Iterable[Path | str]): Exact paths approved for replacement. Defaults
+            to no approvals.
+
+    Returns:
+        list[Path]: Paths successfully written after all outputs complete.
+
+    Raises:
+        FileExistsError: An unapproved output path already exists.
+        OSError: The directory or an output file cannot be written.
+    """
     folder = Path(folder).resolve()
     folder.mkdir(parents=True, exist_ok=True)
     allowed = {Path(path).resolve() for path in overwrite}

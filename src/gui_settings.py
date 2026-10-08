@@ -14,7 +14,15 @@ from .gui_preview import StylePreview
 
 
 def label(text, role=""):
-    """Create a wrapping label whose object-name role selects shared theme styling."""
+    """Create a wrapping label whose object-name role selects shared theme styling.
+
+    Args:
+        text (str): Visible label text.
+        role (str): Stylesheet object-name role. Defaults to no role.
+
+    Returns:
+        QLabel: Wrapping label with the requested style role.
+    """
     widget = QLabel(text)
     if role:
         widget.setObjectName(role)
@@ -23,7 +31,16 @@ def label(text, role=""):
 
 
 def button(text, callback=None, primary=False):
-    """Create a consistently styled action button with an optional click handler."""
+    """Create a consistently styled action button with an optional click handler.
+
+    Args:
+        text (str): Visible button caption.
+        callback (Callable | None): Optional clicked-signal handler. Defaults to None.
+        primary (bool): Whether to use the primary-action style. Defaults to False.
+
+    Returns:
+        QPushButton: Styled action button with its optional signal connection.
+    """
     widget = QPushButton(text)
     widget.setCursor(Qt.CursorShape.PointingHandCursor)
     if primary:
@@ -34,7 +51,14 @@ def button(text, callback=None, primary=False):
 
 
 def card(title=""):
-    """Return a themed container and its layout for assembling settings sections."""
+    """Return a themed container and its layout for assembling settings sections.
+
+    Args:
+        title (str): Optional section heading. Defaults to an empty string.
+
+    Returns:
+        tuple[QFrame, QVBoxLayout]: Card container and layout for adding its contents.
+    """
     widget = QFrame()
     widget.setObjectName("card")
     layout = QVBoxLayout(widget)
@@ -47,10 +71,19 @@ def card(title=""):
 
 
 class ColorControl(QWidget):
-    """Present an ASS color as an RGB swatch and a user-facing opacity percentage."""
+    """Present an ASS color as an RGB swatch and a user-facing opacity percentage.
+
+    Attributes:
+        value (str): Current ASS color in &HAABBGGRR format.
+        changed (Signal): Emits the updated ASS color after a user edit.
+        swatch (QPushButton): RGB caption and color-picker action.
+        opacity (QSpinBox): User-facing opacity percentage.
+    """
+
     changed = Signal(str)
 
     def __init__(self):
+        """Create the RGB swatch and opacity control with an opaque white default."""
         super().__init__()
         self.value = "&H00FFFFFF"
         layout = QHBoxLayout(self)
@@ -66,6 +99,11 @@ class ColorControl(QWidget):
         self.opacity.valueChanged.connect(self.opacity_changed)
 
     def set_value(self, value):
+        """Display an ASS color without emitting another edit signal.
+
+        Args:
+            value (str): Validated ASS color in &HAABBGGRR format.
+        """
         self.value = value
         rgb, opacity = color_to_rgb(value)
         self.swatch.setText(rgb)
@@ -76,21 +114,41 @@ class ColorControl(QWidget):
         self.opacity.blockSignals(False)
 
     def choose(self):
+        """Open the RGB picker while preserving the selected opacity."""
         selected = QColorDialog.getColor(QColor(color_to_rgb(self.value)[0]), self, "Choose subtitle color")
         if selected.isValid():
             self.set_value(rgb_to_color(selected.name(), self.opacity.value()))
             self.changed.emit(self.value)
 
     def opacity_changed(self, opacity):
+        """Encode a new opacity value and emit the updated ASS color.
+
+        Args:
+            opacity (int): Opacity percentage supplied by the spinbox.
+        """
         self.set_value(rgb_to_color(color_to_rgb(self.value)[0], opacity))
         self.changed.emit(self.value)
 
 
 class SettingsEditor(QWidget):
-    """Edit a settings draft and update its preview without applying it to conversion."""
+    """Edit and preview a draft independently of applied settings.
+
+    Attributes:
+        settings (dict): Independent, unapplied ASS settings draft.
+        controls (dict): Widgets keyed by their JSON section and field names.
+        loading (bool): Guard suppressing draft changes during control population.
+        preview (StylePreview): Illustrative rendering of the current draft.
+        changed (Signal): Emits a copied settings draft after user edits.
+    """
+
     changed = Signal(dict)
 
     def __init__(self, settings):
+        """Build settings controls, alignment choices, and a live draft preview.
+
+        Args:
+            settings (dict): Initial validated ASS settings to copy into the draft.
+        """
         super().__init__()
         self.settings = deepcopy(settings)
         self.controls = {}
@@ -234,17 +292,44 @@ class SettingsEditor(QWidget):
         self.set_settings(settings)
 
     def register(self, widget, section, key):
+        """Associate a control with its serialized settings field.
+
+        Args:
+            widget (QWidget): Control to register and name for accessibility/styling.
+            section (str): ScriptInfo or style JSON section.
+            key (str): Settings field represented by the control.
+        """
         # Bind controls to the JSON section/key used by import, export, and reset.
         widget.setObjectName(key)
         self.controls[(section,key)] = widget
 
     def add_text(self, form, text, section, key):
+        """Add a text field connected to the matching draft value.
+
+        Args:
+            form (QFormLayout): Form that receives the labeled control.
+            text (str): Visible field label.
+            section (str): JSON section containing the edited field.
+            key (str): JSON field to update.
+        """
         widget = QLineEdit()
         self.register(widget,section,key)
         widget.textChanged.connect(lambda value:self.update_value(section,key,value))
         form.addRow(text,widget)
 
     def add_number(self, form, text, section, key, low, high, integer=False):
+        """Add a bounded integer or decimal control connected to the draft.
+
+        Args:
+            form (QFormLayout): Form that receives the labeled control.
+            text (str): Visible field label.
+            section (str): JSON section containing the edited field.
+            key (str): JSON field to update.
+            low (int | float): Minimum permitted control value.
+            high (int | float): Maximum permitted control value.
+            integer (bool): Use an integer spinbox instead of decimals. Defaults to
+                False.
+        """
         widget = QSpinBox() if integer else QDoubleSpinBox()
         if not integer:
             widget.setDecimals(2)
@@ -254,7 +339,13 @@ class SettingsEditor(QWidget):
         form.addRow(text,widget)
 
     def update_value(self, section, key, value):
-        """Update only the draft and emit a copy so observers cannot mutate editor state."""
+        """Update the draft and emit an independent copy to observers.
+
+        Args:
+            section (str): JSON section containing the field.
+            key (str): Draft field changed by a control.
+            value (object): New JSON-compatible field value.
+        """
         if self.loading:
             return
         self.settings[section][key] = value
@@ -262,6 +353,11 @@ class SettingsEditor(QWidget):
         self.changed.emit(deepcopy(self.settings))
 
     def set_settings(self, settings):
+        """Populate draft controls while suppressing edit notifications.
+
+        Args:
+            settings (dict): Complete validated ASS settings to display.
+        """
         # Signals still fire while populating controls; the loading guard ignores them.
         self.loading = True
         self.settings = deepcopy(settings)

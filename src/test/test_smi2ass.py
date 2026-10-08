@@ -15,20 +15,24 @@ class ColorConversionTest(unittest.TestCase):
     """Check both color helpers and the actual markup emitted by conversion."""
 
     def setUp(self) -> None:
+        """Locate checkout settings for color-conversion fixtures."""
         self.setting_path = str(PROJECT_ROOT / "src" / "setting")
 
     def test_color_name_is_converted_to_six_digit_hex(self) -> None:
+        """Verify CSS names resolve to RGB hex digits without their prefix."""
         style = AssStyle(setting_path=self.setting_path)
 
         self.assertEqual("ff0000", style.color2hex("red"))
         self.assertEqual("0000ff", style.color2hex("blue"))
 
     def test_rgb_is_converted_to_ass_bgr(self) -> None:
+        """Verify RGB bytes are reordered into ASS BGR color values."""
         self.assertEqual("0000ff", rgb2bgr("ff0000"))
         self.assertEqual("00ff00", rgb2bgr("00ff00"))
         self.assertEqual("ff0000", rgb2bgr("0000ff"))
 
     def test_named_font_color_is_converted_end_to_end(self) -> None:
+        """Verify SAMI named colors become valid ASS overrides without #."""
         smi = """<SAMI>
 <BODY>
 <SYNC Start=1000><P Class=ENCC><FONT COLOR=red>Red text</FONT>

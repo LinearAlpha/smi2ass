@@ -7,7 +7,18 @@ from . import __version__
 
 
 def main(argv=None):
-    """Parse launch options, load optional Qt, and start the desktop event loop."""
+    """Parse launch options, load optional Qt, and start the desktop event loop.
+
+    Args:
+        argv (list[str] | None): Launch arguments. None uses the process command line.
+
+    Returns:
+        int: Qt exit status, smoke-test status, or 1 if the desktop interface cannot
+            load.
+
+    Raises:
+        SystemExit: Argument parsing handles --help, --version, or invalid arguments.
+    """
     parser = argparse.ArgumentParser(description="smi2ass desktop subtitle converter")
     parser.add_argument("files", nargs="*", help="SAMI files to add to the conversion queue")
     parser.add_argument("--version", action="version", version=f"smi2ass GUI {__version__}")

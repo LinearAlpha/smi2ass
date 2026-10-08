@@ -17,9 +17,10 @@ SMOKE = ROOT / "scripts" / "smoke_test.py"
 
 
 class DistributionCheckTest(unittest.TestCase):
-    """Reproduce polluted build environments without downloading runtime dependencies."""
+    """Reproduce polluted builds without downloading runtime dependencies."""
 
     def test_installs_artifact_despite_inherited_same_version_metadata(self):
+        """Verify checkout metadata and pip options cannot divert installation."""
         checker = runpy.run_path(str(CHECKER))
         check_distribution = checker["check_distribution"]
         with tempfile.TemporaryDirectory() as directory:
@@ -72,6 +73,7 @@ class DistributionCheckTest(unittest.TestCase):
             self.assertFalse((root / "wrong-target").exists())
 
     def test_failed_smoke_command_displays_cli_output(self):
+        """Verify failed CLI smoke commands expose original stdout and stderr."""
         error = subprocess.CalledProcessError(
             1, [sys.executable, "-m", "smi2ass"],
             output="CLI stdout\n", stderr="Original CLI failure\n")

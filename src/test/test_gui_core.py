@@ -15,7 +15,15 @@ from smi2ass.gui_core import (
 
 
 def sample(text="Hello", language="ENCC"):
-    """Provide one visible cue and its blank end boundary for focused conversion tests."""
+    """Provide one visible cue and a blank end boundary for conversion tests.
+
+    Args:
+        text (str): Visible subtitle text for the conversion fixture.
+        language (str): SAMI cue class. Defaults to ENCC.
+
+    Returns:
+        str: SAMI markup with one visible cue and its blank end boundary.
+    """
     return f"<SAMI><BODY><SYNC Start=1000><P Class={language}>{text}<SYNC Start=2000><P Class={language}>&nbsp;</BODY></SAMI>"
 
 
@@ -23,6 +31,7 @@ class GuiCoreTest(unittest.TestCase):
     """Cover settings validation, timing, persistence, and reviewed output writes."""
 
     def test_unicode_paths_work_with_legacy_console_encoding(self):
+        """Verify Unicode paths with quiet GUI and legacy-console CLI behavior."""
         from smi2ass import smi2ass
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"한글.smi"
@@ -38,12 +47,14 @@ class GuiCoreTest(unittest.TestCase):
             self.assertIn("Hello",(Path(directory)/"output"/"한글.ass").read_text(encoding="utf-8"))
 
     def test_colors_use_ass_bgr_and_inverted_alpha(self):
+        """Verify ASS color byte order and opacity round trips."""
         self.assertEqual("&H000000FF", rgb_to_color("#FF0000",100))
         self.assertEqual("&H8000FF00", rgb_to_color("#00FF00",50))
         self.assertEqual(("#00FF00",50),color_to_rgb("&H8000FF00"))
         self.assertEqual("&HFFFFFFFF",rgb_to_color("#FFFFFF",0))
 
     def test_import_rejects_broken_settings_without_changing_defaults(self):
+        """Verify invalid imports are rejected without mutating independent defaults."""
         defaults = default_settings()
         for section,key,value in (("style","Name","bad,name"),("style","Fontsize",-1),
                                    ("style","Outline",float("nan")),("style","PrimaryColour","#FFFFFF"),
@@ -57,6 +68,7 @@ class GuiCoreTest(unittest.TestCase):
         self.assertEqual(defaults,default_settings())
 
     def test_presets_and_active_settings_round_trip_and_corrupt_file_recovers(self):
+        """Verify preference round trips and recovery from malformed JSON."""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"gui.json"
             store = PresetStore(path)
@@ -75,6 +87,7 @@ class GuiCoreTest(unittest.TestCase):
             self.assertEqual(default_settings(),fallback.active)
 
     def test_real_conversion_preserves_legacy_text_and_applies_all_style_fields(self):
+        """Verify legacy Korean text, timing, and custom ASS fields reach real output."""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"한글 sample.smi"
             text = "안녕하세요. 오늘은 날씨가 맑습니다. 자막 변환을 확인합니다. 함께 영화를 감상해요."
@@ -94,6 +107,7 @@ class GuiCoreTest(unittest.TestCase):
             self.assertIn(",2,0,8,12,12,50,1",output)
 
     def test_unusable_input_and_offset_report_errors(self):
+        """Verify unusable input and offsets removing every cue produce error records."""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"empty.smi"
             path.write_text("<SAMI></SAMI>",encoding="utf-8")
@@ -104,6 +118,7 @@ class GuiCoreTest(unittest.TestCase):
             self.assertEqual({},prepared.outputs)
 
     def test_timing_offset_rounds_into_next_second_and_rejects_empty_output(self):
+        """Verify centisecond carry, zero starts, and header-only rejection."""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"sample.smi"
             path.write_text(sample(),encoding="utf-8")
@@ -116,6 +131,7 @@ class GuiCoreTest(unittest.TestCase):
             self.assertTrue(prepare_source(source,default_settings(),-2000).error)
 
     def test_zero_start_is_valid_and_invalid_time_is_not_revived_by_offset(self):
+        """Verify offsets keep zero starts and reject malformed timestamps."""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/"sample.smi"
             path.write_text("<SYNC Start=oops><P Class=ENCC>Invalid<SYNC Start=0><P Class=ENCC>Hello<SYNC Start=1000><P Class=ENCC>&nbsp;",encoding="utf-8")
@@ -124,6 +140,7 @@ class GuiCoreTest(unittest.TestCase):
             self.assertNotIn("Invalid",prepared.outputs["sample.ass"])
 
     def test_output_conflicts_and_overwrite_authorization(self):
+        """Verify case-insensitive conflicts and exact-path overwrite approval."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             prepared = []

@@ -11,7 +11,15 @@ from .gui_core import PresetStore, write_json
 
 
 def run_smoke(app, report):
-    """Drive inspection then conversion through Qt's event loop and report an exit status."""
+    """Drive desktop inspection and conversion through the Qt event loop.
+
+    Args:
+        app (QApplication): Running Qt application used for the real desktop flow.
+        report (Path): Destination for the JSON success/failure report.
+
+    Returns:
+        int: Zero after successful checks, or one after a reported failure.
+    """
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         input_file = root / "bilingual.smi"
@@ -39,6 +47,7 @@ def run_smoke(app, report):
         timer = QTimer()
 
         def check():
+            """Advance smoke-test phases when workers are idle and record failures."""
             # Poll without blocking Qt: queued signals must reach the window between phases.
             try:
                 if failures:

@@ -9,7 +9,13 @@ import tempfile
 
 
 def main():
-    """Launch a headless installed/native GUI and check its JSON report and exit code."""
+    """Launch an offscreen GUI and check its report and exit status.
+
+    Raises:
+        RuntimeError: The GUI fails or does not create a report.
+        AssertionError: The report does not indicate success.
+        subprocess.TimeoutExpired: The GUI process exceeds the test deadline.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable")
     args = parser.parse_args()

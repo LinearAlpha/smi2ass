@@ -13,7 +13,11 @@ else:
 
 
 def cmd_arg() -> argparse.ArgumentParser:
-    """Describe CLI options, resolving the default output folder at invocation time."""
+    """Describe CLI options and resolve invocation-time output defaults.
+
+    Returns:
+        argparse.ArgumentParser: Parser defining the public CLI and its defaults.
+    """
     parser = argparse.ArgumentParser(
         prog="smi2ass",
         description="Converting SAMI (SMI) into Advanced SubStation Alpha (ASS) subtitle",
@@ -82,7 +86,13 @@ def cmd_arg() -> argparse.ArgumentParser:
 
 
 def update_style(obj: smi2ass, args: argparse.Namespace) -> None:
-    """Apply explicit style overrides to the converter used for the whole batch."""
+    """Apply explicit style overrides to the converter used for the whole batch.
+
+    Args:
+        obj (smi2ass): Converter whose batch-wide style settings will be changed.
+        args (argparse.Namespace): Parsed CLI options; normalization also updates
+            output_dir and font.
+    """
 
     # Legacy normalization removes one leading space, rather than stripping a path.
     remove_first_char = lambda s: s[:0] + "" + s[1:]
@@ -120,7 +130,12 @@ def update_style(obj: smi2ass, args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    """Configure one converter, then process each input with the same style/offset."""
+    """Configure one converter, then process each input with the same style/offset.
+
+    Raises:
+        OSError: An input/settings file cannot be read or an output cannot be written.
+        ValueError: An input has no valid cues after applying its timing offset.
+    """
     parser: argparse.ArgumentParser = cmd_arg()
     args: argparse.Namespace = parser.parse_args()
 
