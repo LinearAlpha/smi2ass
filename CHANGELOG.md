@@ -1,5 +1,7 @@
 # Unreleased
 
+- Expand `lan_code.json` to 184 languages with ISO code and selected regional SAMI aliases. Preserve existing language codes and unknown fallback; fix case-insensitive `EnglishSC` recognition.
+
 - Add a native desktop GUI with Convert and ASS Settings tabs, drag-and-drop/folder input, background batch conversion, timing offsets, progress, cancellation, and per-file errors.
 - Add a live illustrative style preview, editable ASS settings, persistent presets, and compatible JSON import/export. Require confirmation before replacing existing output files and detect duplicate output names.
 - Keep Qt optional for Python CLI installations; add the `smi2ass-gui` launcher and build separate `smi2ass-gui` Windows/Linux archives. Test the GUI on Python 3.14 and in both extracted archive formats.

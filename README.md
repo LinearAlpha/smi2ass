@@ -91,6 +91,21 @@ Use `-o` to select another output directory. Time offsets are in milliseconds; u
 
 Default font styles and language codes are bundled with the Python package, so conversion works from any directory. Executables use the editable `setting/ass_styles.json` and `setting/lan_code.json` files beside the executable when that folder exists.
 
+`lan_code.json` recognizes 184 languages using the [Library of Congress ISO language code list](https://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt): ISO 639-1 languages plus Filipino. Class aliases include two-/three-letter codes with or without `CC`, and selected regional forms used by SAMI captions (for example, `FRFRCC` and `PTBRCC`). Lookup is case-insensitive; unknown classes still use `und`. Output suffixes use ISO 639-2 bibliographic codes, including the existing `CHI` for Chinese.
+
+| Language | Example SAMI classes | Multilingual output suffix |
+| --- | --- | --- |
+| French | `FRCC`, `FRFRCC`, `FRACC` | `FRE` |
+| German | `DECC`, `DEDECC`, `DEUCC` | `GER` |
+| Spanish | `ESCC`, `ESMXCC` | `SPA` |
+| Portuguese | `PTCC`, `PTBRCC` | `POR` |
+| Arabic | `ARCC`, `ARACC` | `ARA` |
+| Hindi | `HICC`, `HIINCC` | `HIN` |
+| Vietnamese | `VICC`, `VIVNCC` | `VIE` |
+| Filipino | `FILCC`, `FILPHCC` | `FIL` |
+
+Existing Korean aliases `KR`/`KRCC` remain Korean; use `KAU`/`KAUCC` for Kanuri. For a custom class name, add an explicit entry to your `lan_code.json`, such as `"MYFRENCH": "fre"`.
+
 For custom settings with any installation, copy the defaults from [`src/setting`](src/setting) into your own directory, edit them, and run:
 
 ```shell
