@@ -26,10 +26,17 @@ Releases = "https://github.com/LinearAlpha/smi2ass/releases"
 [project.scripts]
 smi2ass = "smi2ass.__main__:main"
 
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.10,<7"]
+
+[project.gui-scripts]
+smi2ass-gui = "smi2ass.gui_launcher:main"
+
 [tool.setuptools]
 include-package-data = false
 packages = ["smi2ass"]
 package-dir = { smi2ass = "src" }
 
 [tool.setuptools.package-data]
-smi2ass = ["setting/*.json", "setting/*.txt"]
+smi2ass = ["setting/*.json", "setting/*.txt", "gui_icons/*.svg"]
+

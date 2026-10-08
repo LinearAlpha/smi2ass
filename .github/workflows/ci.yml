@@ -31,7 +31,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install project with declared runtime dependencies
-        run: python -m pip install .
+        run: python -m pip install . py7zr
       - name: Check runtime dependencies
         run: python -m pip check
       - name: Run regression tests
@@ -48,24 +48,61 @@ jobs:
         with:
           python-version: "3.14"
       - run: python -m pip install build twine
+      - name: Install Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0
       - run: python -m build
       - run: python -m twine check --strict dist/*
-      - run: python scripts/check_distributions.py
+      - run: python scripts/check_distributions.py --gui
       - uses: actions/upload-artifact@v4
         with:
           name: python-distributions
           path: dist/*
           if-no-files-found: error
 
-  executable:
-    name: Build and verify ${{ matrix.os }} executable
+  gui:
+    name: GUI / ${{ matrix.os }} / Python 3.14
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-26.04, windows-latest]
+    env:
+      QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v6
+      - name: Install Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install ".[gui]" py7zr
+      - run: python -m pip check
+      - run: python -m unittest discover -s src/test -v
+      - run: python scripts/smoke_gui.py
+
+  executable:
+    name: Build and verify ${{ matrix.target }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, windows-latest]
+        # Separate target jobs keep the CLI build independent of optional Qt.
+        target: [cli, gui]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Qt runtime libraries
+        if: runner.os == 'Linux' && matrix.target == 'gui'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -75,20 +112,24 @@ jobs:
             requirements-build.txt
       - name: Build and verify distributions with build.sh
         if: runner.os == 'Linux'
-        run: ./build.sh
+        run: |
+          ./build.sh --clean-only
+          ./build.sh --clean --target ${{ matrix.target }}
       - name: Build and verify distributions with build.ps1
         if: runner.os == 'Windows'
         shell: powershell
-        run: .\build.ps1
+        run: |
+          .\build.ps1 -CleanOnly
+          .\build.ps1 -Clean -Target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: executable-${{ matrix.os }}
+          name: executable-${{ matrix.target }}-${{ matrix.os }}
           path: release-assets/*
           if-no-files-found: error
 
   release:
     name: Publish tested release
-    needs: [test, package, executable]
+    needs: [test, package, gui, executable]
     # A release commit on main is explicit publication intent. Normal pushes and
     # pull requests only build/test; manual publication is also available.
     if: >-
@@ -107,6 +148,7 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+      # Publish only the complete expected artifact set, with checksums for every file.
       - name: Check version and write checksums
         id: version
         run: |
@@ -119,6 +161,8 @@ jobs:
           files = sorted(pathlib.Path('release-assets').iterdir())
           expected = {'smi2ass_linux_x86-64.zip', 'smi2ass_linux_x86-64.7z',
                       'smi2ass_windows_x86-64.zip', 'smi2ass_windows_x86-64.7z',
+                      'smi2ass-gui_linux_x86-64.zip', 'smi2ass-gui_linux_x86-64.7z',
+                      'smi2ass-gui_windows_x86-64.zip', 'smi2ass-gui_windows_x86-64.7z',
                       f'smi2ass-{version}-py3-none-any.whl', f'smi2ass-{version}.tar.gz'}
           assert {p.name for p in files} == expected, files
           checksums = ''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files)
@@ -138,5 +182,6 @@ jobs:
           fi
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --notes-file RELEASE_NOTES.md --draft
           gh release upload "$RELEASE_TAG" release-assets/*
-          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" = 7
+          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" = 11
           gh release edit "$RELEASE_TAG" --draft=false --latest
+

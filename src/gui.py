@@ -1,0 +1,905 @@
+"""Native desktop interface. Launch with smi2ass-gui or python -m smi2ass.gui."""
+from copy import deepcopy
+from pathlib import Path
+import sys
+import re
+import threading
+
+from . import __version__
+from .gui_launcher import main
+
+
+STYLESHEET = """
+QWidget { font-family: 'Segoe UI', 'Noto Sans', sans-serif; font-size: 13px; color: #26343c; }
+QMainWindow, QWidget#page { background: #f6f8f9; }
+QFrame#dropZone { background: #f5fafb; border: 1px dashed #9fc7d0; border-radius: 8px; }
+QFrame#card { background: white; border: 1px solid #dfe5e8; border-radius: 12px; }
+QLabel { background: transparent; border: none; }
+QLabel#title { font-size: 27px; font-weight: 600; }
+QLabel#brand { font-size: 20px; font-weight: 600; color: #087e91; }
+QLabel#section { font-size: 15px; font-weight: 600; }
+QLabel#muted { color: #697983; font-size: 12px; }
+QLabel#dirty { color: #9c6a24; background: #fff2d7; padding: 5px 10px; border-radius: 10px; }
+QPushButton { background: white; border: 1px solid #d6dfe4; border-radius: 6px; padding: 7px 12px; }
+QPushButton:hover { background: #edf6f8; border-color: #78b5c0; }
+QPushButton:checked { background: #dff2f5; border-color: #11869a; color: #087184; }
+QPushButton#primary { background: #087f95; color: white; border-color: #087f95; font-weight: 600; padding: 10px 22px; }
+QPushButton#primary:hover { background: #096a7b; }
+QPushButton:disabled { background: #eef1f3; color: #96a1a9; border-color: #e3e7e9; }
+QPushButton#primary:disabled { background: #dce8eb; color: #83939b; border-color: #dce8eb; }
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: white; border: 1px solid #d6dfe4; border-radius: 6px; padding: 6px; min-height: 20px; }
+QComboBox, QSpinBox, QDoubleSpinBox { padding-right: 30px; }
+QComboBox::drop-down { subcontrol-origin: border; subcontrol-position: top right; width: 26px; border: none; border-left: 1px solid #e3e9ec; }
+QComboBox::down-arrow { image: url("@ICONS@/arrow-down.svg"); width: 12px; height: 8px; }
+QComboBox QAbstractItemView { background: white; color: #26343c; selection-background-color: #dff2f5; selection-color: #087184; }
+QSpinBox::up-button, QDoubleSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 24px; background: #f4f8f9; border-left: 1px solid #e3e9ec; border-bottom: 1px solid #e3e9ec; border-top-right-radius: 6px; }
+QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 24px; background: #f4f8f9; border-left: 1px solid #e3e9ec; border-bottom-right-radius: 6px; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url("@ICONS@/arrow-up.svg"); width: 12px; height: 8px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url("@ICONS@/arrow-down.svg"); width: 12px; height: 8px; }
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus { border-color: #11869a; }
+QTabWidget::pane { border: none; }
+QTabBar::tab { padding: 12px 24px; color: #65757f; background: transparent; border-bottom: 3px solid transparent; }
+QTabBar::tab:selected { color: #087f95; border-bottom-color: #087f95; font-weight: 600; }
+QTableWidget { border: none; background: white; gridline-color: #edf0f2; selection-background-color: #e8f5f7; selection-color: #26343c; }
+QHeaderView::section { background: #f5f8f9; color: #6a7881; padding: 9px; border: none; font-weight: 500; }
+QCheckBox { spacing: 8px; }
+QCheckBox::indicator, QAbstractItemView::indicator { width: 15px; height: 15px; background: white; border: 1px solid #b5c4cc; border-radius: 3px; }
+QCheckBox::indicator:checked, QAbstractItemView::indicator:checked { background: #087f95; border-color: #087f95; image: url("@ICONS@/check.svg"); }
+QProgressBar { border: none; border-radius: 3px; background: #e4ecef; height: 6px; text-align: center; }
+QProgressBar::chunk { background: #11869a; border-radius: 3px; }
+QScrollArea { background: #f6f8f9; }
+QScrollBar:vertical { width: 9px; background: transparent; }
+QScrollBar::handle:vertical { background: #d1dce1; border-radius: 4px; min-height: 24px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; border: none; background: transparent; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+"""
+STYLESHEET = STYLESHEET.replace("@ICONS@", (Path(__file__).resolve().parent / "gui_icons").as_posix())
+
+
+# Map the shared control styles to dark surfaces without changing layout.
+DARK_COLORS = {
+    "#f5fafb": "#233943", "#9fc7d0": "#5c91a1",
+    "#f6f8f9": "#151d26", "#26343c": "#e4edf3", "#dfe5e8": "#354352",
+    "#087e91": "#69cfdf", "#697983": "#a4b5c3", "#9c6a24": "#f0ca86",
+    "#fff2d7": "#493b25", "#d6dfe4": "#435363", "#edf6f8": "#293e49",
+    "#78b5c0": "#69b4c3", "#dff2f5": "#24434e", "#11869a": "#36a9bd",
+    "#087184": "#8bdbea", "#eef1f3": "#26313d", "#96a1a9": "#80909f",
+    "#e3e7e9": "#354352", "#dce8eb": "#2b404b", "#83939b": "#93a5b0",
+    "#e3e9ec": "#354352", "#f4f8f9": "#263440", "#65757f": "#a4b5c3",
+    "#edf0f2": "#354352", "#e8f5f7": "#24434e", "#f5f8f9": "#263440",
+    "#6a7881": "#a4b5c3", "#b5c4cc": "#607384", "#e4ecef": "#354352",
+    "#d1dce1": "#516374", "#edf2f4": "#263440", "#a4b2ba": "#607384",
+}
+DARK_STYLESHEET = re.sub(r"#[0-9a-f]{6}", lambda match: DARK_COLORS.get(match[0], match[0]), STYLESHEET)
+DARK_STYLESHEET = DARK_STYLESHEET.replace("background: white", "background: #202b36")
+DARK_STYLESHEET = DARK_STYLESHEET.replace("arrow-down.svg", "arrow-down-dark.svg").replace("arrow-up.svg", "arrow-up-dark.svg")
+DARK_STYLESHEET += "\nQTabBar::tab:selected { color: #69cfdf; border-bottom-color: #69cfdf; }\nQToolTip { background: #202b36; color: #e4edf3; border: 1px solid #435363; }"
+
+
+# Keep the CLI and --version usable without Qt installed.
+try:
+    from PySide6.QtCore import QStandardPaths, QThread, QTimer, Qt, QUrl, Signal
+    from PySide6.QtGui import QColor, QDesktopServices, QPalette
+    from PySide6.QtWidgets import (
+        QApplication, QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout,
+        QHeaderView, QInputDialog, QLayout, QLineEdit, QMainWindow, QMessageBox, QProgressBar,
+        QScrollArea, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
+    )
+    from .gui_core import (
+        PresetStore, color_to_rgb, conflicting_names, default_settings, inspect_source,
+        prepare_source, validate_settings, write_json, write_prepared,
+    )
+    from .gui_preview import StylePreview
+    from .gui_settings import SettingsEditor, button, card, label
+except ImportError:
+    if __name__ == "__main__":
+        raise SystemExit(main())
+    raise
+
+
+def apply_theme(app, theme="light"):
+    """Apply a complete palette and matching controls independent of OS settings.
+
+    Args:
+        app (QApplication): Running Qt application whose global style will change.
+        theme (str): Requested theme; dark selects dark colors, otherwise light.
+            Defaults to light.
+    """
+    dark = theme == "dark"
+    app.setStyle("Fusion")
+    app.styleHints().setColorScheme(Qt.ColorScheme.Dark if dark else Qt.ColorScheme.Light)
+    palette = QPalette()
+    colors = {
+        QPalette.ColorRole.Window: "#f6f8f9",
+        QPalette.ColorRole.WindowText: "#26343c",
+        QPalette.ColorRole.Base: "#ffffff",
+        QPalette.ColorRole.AlternateBase: "#f5f8f9",
+        QPalette.ColorRole.Text: "#26343c",
+        QPalette.ColorRole.Button: "#ffffff",
+        QPalette.ColorRole.ButtonText: "#26343c",
+        QPalette.ColorRole.BrightText: "#ffffff",
+        QPalette.ColorRole.Highlight: "#087f95",
+        QPalette.ColorRole.HighlightedText: "#ffffff",
+        QPalette.ColorRole.Link: "#087f95",
+        QPalette.ColorRole.LinkVisited: "#087184",
+        QPalette.ColorRole.ToolTipBase: "#ffffff",
+        QPalette.ColorRole.ToolTipText: "#26343c",
+        QPalette.ColorRole.PlaceholderText: "#697983",
+        QPalette.ColorRole.Light: "#ffffff",
+        QPalette.ColorRole.Midlight: "#edf2f4",
+        QPalette.ColorRole.Mid: "#d6dfe4",
+        QPalette.ColorRole.Dark: "#a4b2ba",
+        QPalette.ColorRole.Shadow: "#697983",
+    }
+    for role, color in colors.items():
+        if dark and role not in (QPalette.ColorRole.BrightText, QPalette.ColorRole.HighlightedText):
+            color = "#202b36" if color == "#ffffff" else DARK_COLORS.get(color, color)
+        palette.setColor(role, QColor(color))
+    for role in (QPalette.ColorRole.Text, QPalette.ColorRole.WindowText, QPalette.ColorRole.ButtonText):
+        palette.setColor(QPalette.ColorGroup.Disabled, role, QColor("#80909f" if dark else "#96a1a9"))
+    # CSS does not cover every viewport or popup, so set palette roles as well.
+    app.setPalette(palette)
+    app.setStyleSheet(DARK_STYLESHEET if dark else STYLESHEET)
+
+
+class Job(QThread):
+    """Run blocking work off the UI thread and report progress through Qt signals.
+
+    Attributes:
+        work (Callable[[Job], object]): Blocking callback executed by the worker thread.
+        cancel (threading.Event): Cooperative cancellation flag checked between files.
+        update (Signal): Emits a source, status, and detail/progress payload.
+        result (Signal): Emits the callback's result after successful work.
+        error (Signal): Emits failure text if the callback raises.
+    """
+
+    update = Signal(object, str, object)
+    result = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, work, cancel):
+        """Attach work and its cancellation flag before starting the thread.
+
+        Args:
+            work (Callable[[Job], object]): Callback receiving this worker for progress
+                signals.
+            cancel (threading.Event): Cancellation flag shared with the window.
+        """
+        super().__init__()
+        self.work, self.cancel = work, cancel
+
+    def run(self):
+        """Execute work and emit its result or a caught exception message."""
+        try:
+            self.result.emit(self.work(self))
+        except Exception as error:
+            self.error.emit(str(error))
+
+
+class DropZone(QFrame):
+    """Accept local file URLs and let the window handle scanning and validation.
+
+    Attributes:
+        paths (Signal): Emits local dropped filesystem paths as a list.
+    """
+
+    paths = Signal(list)
+
+    def __init__(self):
+        """Create the themed drop area and enable local file drops."""
+        super().__init__()
+        self.setAcceptDrops(True)
+        self.setObjectName("dropZone")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12,14,12,14)
+        title = label("↓   Drop .smi files here", "section")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle = label("SAMI subtitle files · .smi and .sami", "muted")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+
+    def dragEnterEvent(self, event):
+        """Accept a drag only when every supplied URL points to a local file.
+
+        Args:
+            event (QDragEnterEvent): Qt drag-enter event containing candidate URLs.
+        """
+        if event.mimeData().hasUrls() and all(url.isLocalFile() for url in event.mimeData().urls()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        """Forward dropped local paths to the window's input scanner.
+
+        Args:
+            event (QDropEvent): Accepted drop event containing local URLs.
+        """
+        self.paths.emit([url.toLocalFile() for url in event.mimeData().urls()])
+        event.acceptProposedAction()
+
+
+class MainWindow(QMainWindow):
+    """Coordinate the conversion queue, settings draft, and background workers.
+
+    Attributes:
+        store (PresetStore): Saved styles, presets, and UI preferences.
+        active (dict): Applied settings copied independently from the editor draft.
+        sources (list[Source]): Queue metadata kept in the same order as table rows.
+        jobs (set[Job]): Workers retained until their finished signals arrive.
+        busy (bool): Whether an inspection or conversion phase is active.
+        closing (bool): Whether window closure is waiting for workers to finish.
+        cancel (threading.Event): Cancellation flag for the current worker phase.
+    """
+
+    def __init__(self, config_path=None):
+        """Load preferences and assemble conversion and settings screens.
+
+        Args:
+            config_path (Path | str | None): Preferences path override. None uses Qt's
+                application config directory.
+        """
+        super().__init__()
+        self.setWindowTitle(f"smi2ass · {__version__}")
+        self.resize(1180, 960)
+        self.setMinimumSize(980, 720)
+        path = config_path or Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation)) / "gui.json"
+        self.store = PresetStore(path)
+        apply_theme(QApplication.instance(), self.store.theme)
+        # Applied settings are separate from the editor draft until Apply is chosen.
+        self.active = deepcopy(self.store.active)
+        self.sources = []
+        self.jobs = set()
+        self.busy = False
+        self.closing = False
+        self.cancel = threading.Event()
+        root = QWidget()
+        root.setObjectName("page")
+        self.setCentralWidget(root)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(30,18,30,22)
+        layout.setSpacing(12)
+        header = QHBoxLayout()
+        header.addWidget(label("▤  smi2ass", "brand"))
+        header.addStretch()
+        header.addWidget(label("SAMI → ASS", "muted"))
+        header.addSpacing(16)
+        header.addWidget(label("Theme", "muted"))
+        self.theme_selector = QComboBox()
+        self.theme_selector.addItem("Light", "light")
+        self.theme_selector.addItem("Dark", "dark")
+        self.theme_selector.setCurrentIndex(1 if self.store.theme == "dark" else 0)
+        self.theme_selector.setAccessibleName("Application theme")
+        self.theme_selector.currentIndexChanged.connect(self.change_theme)
+        header.addWidget(self.theme_selector)
+        layout.addLayout(header)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.make_convert_page(), "Convert")
+        self.tabs.addTab(self.make_settings_page(), "ASS Settings")
+        layout.addWidget(self.tabs, 1)
+        self.refresh_presets()
+        self.refresh_summary()
+        if self.store.load_error:
+            QTimer.singleShot(0, lambda: self.show_error(self.store.load_error))
+
+    def change_theme(self):
+        """Apply the selected global theme and persist its preference."""
+        self.store.theme = self.theme_selector.currentData()
+        apply_theme(QApplication.instance(), self.store.theme)
+        self.persist()
+
+    def make_convert_page(self):
+        """Assemble input queue, output, timing, and applied-style controls.
+
+        Returns:
+            QWidget: Conversion tab page with controls stored on this window.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0,18,0,0)
+        layout.setSpacing(16)
+        layout.addWidget(label("Convert subtitles", "title"))
+        layout.addWidget(label("Add SAMI files, choose your style, and convert to ASS.", "muted"))
+        columns = QHBoxLayout()
+        columns.setSpacing(22)
+        self.input_panel = QWidget()
+        left = QVBoxLayout(self.input_panel)
+        left.setContentsMargins(0,0,0,0)
+        left.setSpacing(16)
+        sources, body = card("Source files")
+        tools = QHBoxLayout()
+        tools.addWidget(button("Add files", self.add_files))
+        tools.addWidget(button("Add folder", self.add_folder))
+        tools.addStretch()
+        tools.addWidget(button("Clear list", self.clear_sources))
+        body.addLayout(tools)
+        drop = DropZone()
+        drop.paths.connect(self.add_paths)
+        body.addWidget(drop)
+        self.table = QTableWidget(0,5)
+        self.table.setHorizontalHeaderLabels(["File", "Languages", "Encoding", "Status", ""])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.verticalHeader().hide()
+        self.table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
+        for column,width in ((1,90),(2,90),(3,95),(4,38)):
+            self.table.setColumnWidth(column,width)
+        self.table.setMinimumHeight(160)
+        self.table.itemChanged.connect(lambda _: self.refresh_summary())
+        body.addWidget(self.table,1)
+        self.queue_summary = label("Add files to get started.", "muted")
+        body.addWidget(self.queue_summary)
+        left.addWidget(sources,1)
+        output, body = card("Output")
+        row = QHBoxLayout()
+        self.output = QLineEdit(self.store.output)
+        self.output.setAccessibleName("Output folder")
+        self.output.setPlaceholderText("Choose an output folder")
+        row.addWidget(self.output,1)
+        row.addWidget(button("Browse…",self.browse_output))
+        body.addLayout(row)
+        self.open_output = QCheckBox("Open output folder after conversion")
+        self.open_output.setChecked(self.store.open_output)
+        body.addWidget(self.open_output)
+        body.addWidget(label("One ASS file per language · name.ass or name-ENG.ass / name-KOR.ass", "muted"))
+        left.addWidget(output)
+        timing, body = card("Timing")
+        row = QHBoxLayout()
+        row.addWidget(label("Offset"))
+        self.offset = QSpinBox()
+        self.offset.setRange(-86400000,86400000)
+        self.offset.setSuffix(" ms")
+        self.offset.setAccessibleName("Timing offset")
+        row.addWidget(self.offset)
+        row.addStretch()
+        body.addLayout(row)
+        body.addWidget(label("Positive values delay subtitles. Negative values advance them.", "muted"))
+        left.addWidget(timing)
+        columns.addWidget(self.input_panel, 7)
+        style_card, body = card("ASS style")
+        body.addWidget(label("Preset", "muted"))
+        self.preset = QComboBox()
+        self.preset.setAccessibleName("ASS style preset")
+        self.preset.currentTextChanged.connect(self.select_preset)
+        body.addWidget(self.preset)
+        self.convert_preview = StylePreview()
+        self.convert_preview.setMinimumHeight(190)
+        body.addWidget(self.convert_preview)
+        self.style_summary = label("")
+        self.style_summary.setStyleSheet("line-height: 1.5;")
+        body.addWidget(self.style_summary)
+        body.addWidget(button("Edit ASS settings",lambda:self.tabs.setCurrentIndex(1)))
+        body.addWidget(label("Settings are applied to every selected file.\nInline styling in the SAMI file can override the base style.", "muted"))
+        body.addStretch()
+        columns.addWidget(style_card, 3)
+        self.style_card = style_card
+        content = QWidget()
+        content.setLayout(columns)
+        columns.setContentsMargins(0,0,5,0)
+        columns.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(content)
+        layout.addWidget(scroll,1)
+        self.progress = QProgressBar()
+        self.progress.setTextVisible(False)
+        self.progress.hide()
+        layout.addWidget(self.progress)
+        footer = QHBoxLayout()
+        self.status = label("Ready", "muted")
+        footer.addWidget(self.status,1)
+        self.cancel_button = button("Cancel", self.cancel_work)
+        self.cancel_button.hide()
+        footer.addWidget(self.cancel_button)
+        self.convert_button = button("Convert files", self.start_conversion, primary=True)
+        self.convert_button.setEnabled(False)
+        footer.addWidget(self.convert_button)
+        layout.addLayout(footer)
+        return page
+
+    def make_settings_page(self):
+        """Assemble the settings draft editor and its apply/import/export actions.
+
+        Returns:
+            QWidget: ASS Settings tab page.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0,18,0,0)
+        layout.setSpacing(16)
+        row = QHBoxLayout()
+        row.addWidget(label("ASS Settings", "title"))
+        row.addStretch()
+        self.dirty = label("Unsaved changes", "dirty")
+        self.dirty.hide()
+        row.addWidget(self.dirty)
+        layout.addLayout(row)
+        layout.addWidget(label("Customize your subtitle style and preview the result.", "muted"))
+        self.editor = SettingsEditor(self.active)
+        self.editor.changed.connect(lambda _: self.dirty.setVisible(self.editor.settings != self.active))
+        layout.addWidget(self.editor,1)
+        row = QHBoxLayout()
+        row.addWidget(button("Reset defaults",self.reset_settings))
+        row.addWidget(button("Import settings",self.import_settings))
+        row.addWidget(button("Export settings",self.export_settings))
+        row.addStretch()
+        row.addWidget(button("Save preset",self.save_preset))
+        row.addWidget(button("Apply to conversion",self.apply_settings,primary=True))
+        layout.addLayout(row)
+        return page
+
+    def show_error(self, text):
+        """Display an operation or validation warning on the UI thread.
+
+        Args:
+            text (str): Warning message shown in a modal dialog.
+        """
+        QMessageBox.warning(self,"smi2ass",text)
+
+    def persist(self):
+        """Save applied settings and UI preferences independently of the draft.
+
+        Returns:
+            bool: True if preferences were saved; False after displaying a recoverable
+                error.
+        """
+        self.store.active = deepcopy(self.active)
+        self.store.output = self.output.text()
+        self.store.open_output = self.open_output.isChecked()
+        try:
+            self.store.save()
+            return True
+        except (OSError, ValueError) as error:
+            self.show_error(f"Preferences could not be saved.\n{error}")
+            return False
+
+    def refresh_presets(self):
+        """Rebuild preset choices without triggering selection or replacing the draft."""
+        # Refreshing choices must not trigger selection handlers or discard a draft.
+        self.preset.blockSignals(True)
+        self.preset.clear()
+        self.preset.addItem("Custom")
+        self.preset.addItems(self.store.presets)
+        match = next((name for name,value in self.store.presets.items() if value == self.active),"Custom")
+        self.preset.setCurrentText(match)
+        self.preset.blockSignals(False)
+
+    def select_preset(self,name):
+        """Apply a named preset after any necessary draft-discard confirmation.
+
+        Args:
+            name (str): Selected preset name; unknown names leave settings unchanged.
+        """
+        if name not in self.store.presets:
+            return
+        if self.editor.settings != self.active and not self.discard_draft():
+            self.refresh_presets()
+            return
+        self.active = deepcopy(self.store.presets[name])
+        self.editor.set_settings(self.active)
+        self.dirty.hide()
+        self.persist()
+        self.refresh_summary()
+
+    def discard_draft(self):
+        """Ask whether unapplied ASS settings may be discarded.
+
+        Returns:
+            bool: True only when the user chooses Discard.
+        """
+        return QMessageBox.question(self,"Discard changes?","Discard the unapplied ASS settings changes?",
+                                    QMessageBox.StandardButton.Discard|QMessageBox.StandardButton.Cancel,
+                                    QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Discard
+
+    def apply_settings(self):
+        """Validate the draft before replacing the settings used by conversion workers.
+
+        Returns:
+            bool: True after applying valid settings; False if draft validation fails.
+        """
+        try:
+            self.active = validate_settings(self.editor.settings)
+        except ValueError as error:
+            self.show_error(str(error))
+            return False
+        self.editor.set_settings(self.active)
+        self.dirty.hide()
+        self.persist()
+        self.refresh_presets()
+        self.refresh_summary()
+        self.tabs.setCurrentIndex(0)
+        return True
+
+    def reset_settings(self):
+        """Replace the editor draft with bundled defaults after discard confirmation."""
+        if self.editor.settings != self.active and not self.discard_draft():
+            return
+        self.editor.set_settings(default_settings())
+        self.dirty.setVisible(self.editor.settings != self.active)
+
+    def import_settings(self):
+        """Import validated JSON into the draft without applying it to conversion."""
+        import json
+        path,_ = QFileDialog.getOpenFileName(self,"Import ASS settings","","JSON settings (*.json)")
+        if not path:
+            return
+        try:
+            settings = validate_settings(json.loads(Path(path).read_text(encoding="utf-8-sig")))
+            if self.editor.settings != self.active and not self.discard_draft():
+                return
+            self.editor.set_settings(settings)
+            self.dirty.setVisible(settings != self.active)
+        except (OSError,ValueError) as error:
+            self.show_error(f"Could not import settings.\n{error}")
+
+    def export_settings(self):
+        """Validate and export the editor draft to a user-selected JSON file."""
+        try:
+            settings = validate_settings(self.editor.settings)
+            path,_ = QFileDialog.getSaveFileName(self,"Export ASS settings","ass_styles.json","JSON settings (*.json)")
+            if path:
+                write_json(path,settings)
+        except (OSError,ValueError) as error:
+            self.show_error(f"Could not export settings.\n{error}")
+
+    def save_preset(self):
+        """Save a validated draft under a chosen preset name and apply it."""
+        name,ok = QInputDialog.getText(self,"Save preset","Preset name")
+        name = name.strip()
+        if not ok or not name:
+            return
+        if name in ("Default","Custom"):
+            self.show_error("Choose a name other than Default or Custom.")
+            return
+        if name in self.store.presets and QMessageBox.question(self,"Replace preset?",f'Replace "{name}"?') != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.store.presets[name] = validate_settings(self.editor.settings)
+            self.apply_settings()
+        except ValueError as error:
+            self.show_error(str(error))
+
+    def selected_sources(self):
+        """Collect checked queue entries whose inspection succeeded.
+
+        Returns:
+            list[Source]: Usable selected inputs in queue order.
+        """
+        return [source for row,source in enumerate(self.sources)
+                if not source.error and self.table.item(row,0).checkState() == Qt.CheckState.Checked]
+
+    def refresh_summary(self):
+        """Refresh queue counts, conversion availability, and style preview."""
+        selected = self.selected_sources()
+        count = len(selected)
+        outputs = sum(len(source.languages) for source in selected)
+        self.queue_summary.setText(f"{count} selected · {outputs} ASS output files" if self.sources else "Add files to get started.")
+        self.convert_button.setText(f"Convert {count} file{'s' if count != 1 else ''}")
+        self.convert_button.setEnabled(bool(count) and not self.busy)
+        style,info = self.active["style"],self.active["ScriptInfo"]
+        alignment = ("Bottom left","Bottom center","Bottom right","Middle left","Center","Middle right","Top left","Top center","Top right")[int(style["Alignment"])-1]
+        self.style_summary.setText(f"Font     {style['Fontname']}\nSize     {style['Fontsize']:g} px\nText     {color_to_rgb(style['PrimaryColour'])[0]}\nOutline  {style['Outline']:g} px\nPosition {alignment}\nCanvas   {info['PlayResX']} × {info['PlayResY']}")
+        self.convert_preview.set_settings(self.active)
+
+    def add_files(self):
+        """Open a SAMI file picker and queue the selected input paths."""
+        paths,_ = QFileDialog.getOpenFileNames(self,"Add SAMI files","","SAMI subtitles (*.smi *.sami *.SMI *.SAMI)")
+        self.add_paths(paths)
+
+    def add_folder(self):
+        """Choose a folder for recursive SAMI input scanning."""
+        folder = QFileDialog.getExistingDirectory(self,"Add folder")
+        if folder:
+            self.add_paths([folder])
+
+    def add_paths(self, paths):
+        """Scan files/folders off the UI thread, deduplicating resolved source paths.
+
+        Args:
+            paths (Iterable[Path | str]): Files or folders to scan; duplicates and
+                unsupported files are skipped.
+        """
+        if self.busy or not paths:
+            return
+        known = {source.path for source in self.sources}
+        def inspect(job):
+            """Inspect new SAMI candidates and emit rows until done or cancelled.
+
+            Args:
+                job (Job): Worker carrying the cancellation flag and row-update signal.
+            """
+            found = set()
+            for raw in paths:
+                path = Path(raw)
+                candidates = path.rglob("*") if path.is_dir() else [path]
+                for candidate in candidates:
+                    if job.cancel.is_set():
+                        return None
+                    if candidate.suffix.lower() not in (".smi",".sami") or not candidate.is_file():
+                        continue
+                    candidate = candidate.resolve()
+                    if candidate in known or candidate in found:
+                        continue
+                    found.add(candidate)
+                    source = inspect_source(candidate)
+                    job.update.emit(source,"add",None)
+            return None
+        self.status.setText("Reading subtitle files…")
+        self.start_job(inspect,self.inspection_done)
+
+    def inspection_done(self, _):
+        """Leave inspection mode and show whether the queue contains files.
+
+        Args:
+            _ (None): Unused completion payload from the inspection worker.
+        """
+        self.set_busy(False)
+        self.status.setText("Ready" if self.sources else "No SAMI files found.")
+
+    def handle_update(self,source,status,extra):
+        """Receive worker signals on the UI thread, where table widgets may be changed.
+
+        Args:
+            source (Source): Input whose queue row is added or updated.
+            status (str): Worker status, or add when inserting a new source row.
+            extra (str | int | None): Error detail, progress count, or no extra
+                information.
+        """
+        if status == "add":
+            row = len(self.sources)
+            self.sources.append(source)
+            self.table.insertRow(row)
+            file_item = QTableWidgetItem(source.path.name)
+            file_item.setToolTip(str(source.path))
+            file_item.setCheckState(Qt.CheckState.Unchecked if source.error else Qt.CheckState.Checked)
+            if source.error:
+                file_item.setFlags(file_item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+            # Suppress itemChanged while the new row is incomplete.
+            self.table.blockSignals(True)
+            self.table.setItem(row,0,file_item)
+            self.table.setItem(row,1,QTableWidgetItem(", ".join(language.upper() for language in source.languages)))
+            self.table.setItem(row,2,QTableWidgetItem(source.encoding.upper().replace("_","-")))
+            self.table.setItem(row,3,QTableWidgetItem("Error" if source.error else "Ready"))
+            self.table.item(row,3).setToolTip(source.error)
+            # Capture the source in the callback so the remove action stays tied to this row.
+            remove = button("×",lambda _,source=source:self.remove_source(source))
+            remove.setAccessibleName(f"Remove {source.path.name}")
+            self.table.setCellWidget(row,4,remove)
+            self.table.setRowHeight(row,43)
+            self.table.blockSignals(False)
+            self.refresh_summary()
+            return
+        row = self.sources.index(source)
+        self.table.item(row,3).setText(status)
+        self.table.item(row,3).setToolTip(str(extra or ""))
+        self.status.setText(f"{source.path.name} · {status}")
+        if isinstance(extra,int):
+            self.progress.setValue(extra)
+
+    def remove_source(self,source):
+        """Remove a source and its matching table row while the window is idle.
+
+        Args:
+            source (Source): Queue entry to remove.
+        """
+        if self.busy:
+            return
+        row = self.sources.index(source)
+        self.table.blockSignals(True)
+        self.table.removeRow(row)
+        self.sources.pop(row)
+        self.table.blockSignals(False)
+        self.refresh_summary()
+
+    def clear_sources(self):
+        """Clear queue metadata and table rows, then refresh selection summaries."""
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        self.sources.clear()
+        self.table.blockSignals(False)
+        self.refresh_summary()
+
+    def browse_output(self):
+        """Choose an output directory and update the destination field."""
+        folder = QFileDialog.getExistingDirectory(self,"Output folder",self.output.text())
+        if folder:
+            self.output.setText(folder)
+
+    def set_busy(self,busy):
+        """Enable or disable editing controls for the current worker phase.
+
+        Args:
+            busy (bool): Whether background work is active.
+        """
+        self.busy = busy
+        self.input_panel.setEnabled(not busy)
+        self.style_card.setEnabled(not busy)
+        self.tabs.setTabEnabled(1,not busy)
+        self.progress.setVisible(busy)
+        self.cancel_button.setVisible(busy)
+        self.cancel_button.setEnabled(busy)
+        self.refresh_summary()
+
+    def start_job(self,work,result):
+        """Start a retained worker and connect its signals to UI-thread handlers.
+
+        Args:
+            work (Callable[[Job], object]): Background operation receiving its worker
+                instance.
+            result (Callable[[object], None]): UI-thread callback receiving the
+                operation result.
+        """
+        self.cancel = threading.Event()
+        self.set_busy(True)
+        job = Job(work,self.cancel)
+        # Keep QThread alive until finished, even if its result starts the next job.
+        self.jobs.add(job)
+        job.update.connect(self.handle_update)
+        job.result.connect(result)
+        job.error.connect(self.job_failed)
+        job.finished.connect(lambda:self.finish_job(job))
+        job.start()
+
+    def finish_job(self,job):
+        """Release a finished worker and complete any deferred window closure.
+
+        Args:
+            job (Job): Worker whose finished signal has arrived.
+        """
+        self.jobs.discard(job)
+        job.deleteLater()
+        if self.closing and not self.jobs:
+            self.set_busy(False)
+            self.close()
+
+    def job_failed(self,error):
+        """Leave busy mode and report a worker failure to the user.
+
+        Args:
+            error (str): Failure message emitted by the worker.
+        """
+        self.set_busy(False)
+        self.status.setText("Operation failed")
+        self.show_error(error)
+
+    def cancel_work(self):
+        """Request cooperative cancellation after the current file finishes."""
+        # Workers check this between files so an in-progress write can finish.
+        self.cancel.set()
+        self.cancel_button.setEnabled(False)
+        self.status.setText("Cancelling after the current file…")
+
+    def start_conversion(self):
+        """Snapshot selected inputs/settings and prepare outputs without writing files."""
+        sources = self.selected_sources()
+        if not sources or self.busy:
+            return
+        if not self.output.text().strip():
+            self.show_error("Choose an output folder first.")
+            return
+        if self.editor.settings != self.active:
+            answer = QMessageBox.question(self,"Apply settings?","Apply your ASS settings changes before converting?",
+                QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No|QMessageBox.StandardButton.Cancel)
+            if answer == QMessageBox.StandardButton.Cancel:
+                return
+            if answer == QMessageBox.StandardButton.Yes and not self.apply_settings():
+                return
+        self.persist()
+        # Snapshot UI values on the main thread; workers only use this copy.
+        settings,offset = deepcopy(self.active),self.offset.value()
+        self.progress.setRange(0,len(sources)*2)
+        self.progress.setValue(0)
+        # Preparation is read-only; filesystem writes start after conflict review.
+        def prepare(job):
+            """Convert selected inputs in memory and emit per-file progress.
+
+            Args:
+                job (Job): Preparation worker with progress and cancellation channels.
+
+            Returns:
+                list[Prepared]: Completed preparations, possibly partial after
+                    cancellation.
+            """
+            prepared = []
+            for index,source in enumerate(sources):
+                if job.cancel.is_set():
+                    break
+                job.update.emit(source,"Converting",None)
+                item = prepare_source(source,settings,offset)
+                prepared.append(item)
+                job.update.emit(source,"Error" if item.error else "Prepared",item.error or index+1)
+            return prepared
+        self.start_job(prepare,self.prepared_done)
+
+    def prepared_done(self,prepared):
+        """Review prepared names and confirm overwrites on the UI thread.
+
+        Args:
+            prepared (list[Prepared]): Prepared outputs and conversion errors to review
+                before saving.
+        """
+        if self.cancel.is_set() or self.closing:
+            self.set_busy(False)
+            self.status.setText("Cancelled · no output files written")
+            return
+        duplicates = conflicting_names(prepared)
+        blocked = {path for paths in duplicates.values() for path in paths}
+        for item in prepared:
+            if item.source.path in blocked:
+                item.error = "Output filename conflicts with another source. Convert these files to separate folders."
+                self.handle_update(item.source,"Error",item.error)
+        folder = Path(self.output.text()).expanduser().resolve()
+        valid = [item for item in prepared if not item.error]
+        existing = [folder/name for item in valid for name in item.outputs if (folder/name).exists()]
+        if existing:
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle("Replace output files?")
+            dialog.setText(f"{len(existing)} output file(s) already exist. Replace them?")
+            dialog.setDetailedText("\n".join(str(path) for path in existing))
+            dialog.setStandardButtons(QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.Cancel)
+            dialog.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            if dialog.exec() != QMessageBox.StandardButton.Yes:
+                self.set_busy(False)
+                self.status.setText("Cancelled · existing files were kept")
+                return
+        # Pass only the exact existing paths approved in the dialog to the writer.
+        def save(job):
+            """Write reviewed outputs with only the approved overwrite paths.
+
+            Args:
+                job (Job): Save worker with progress and cancellation channels.
+
+            Returns:
+                tuple: Written paths, error messages, cancellation flag, and output
+                    folder.
+            """
+            written,errors = [], [item.error for item in prepared if item.error]
+            for index,item in enumerate(valid):
+                if job.cancel.is_set():
+                    break
+                try:
+                    outputs = write_prepared(item,folder,existing)
+                    written.extend(outputs)
+                    job.update.emit(item.source,"Done",len(prepared)+index+1)
+                except Exception as error:
+                    errors.append(str(error))
+                    job.update.emit(item.source,"Error",str(error))
+            return written,errors,job.cancel.is_set(),folder
+        self.start_job(save,self.conversion_done)
+
+    def conversion_done(self,result):
+        """Leave busy mode, summarize saved files, and optionally open their folder.
+
+        Args:
+            result (tuple): Written paths, errors, cancellation flag, and folder from
+                the save worker.
+        """
+        written,errors,cancelled,folder = result
+        self.set_busy(False)
+        self.status.setText(f"{'Cancelled' if cancelled else 'Completed'} · {len(written)} ASS files saved" + (f" · {len(errors)} file errors (see row details)" if errors else ""))
+        if written and self.open_output.isChecked() and not self.closing:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def closeEvent(self,event):
+        """Confirm draft discard or defer closing until active workers finish.
+
+        Args:
+            event (QCloseEvent): Qt close request to accept or ignore.
+        """
+        # Defer destruction until workers finish; destroying a running QThread is unsafe.
+        if self.busy or self.jobs:
+            if QMessageBox.question(self,"Cancel and close?","Cancel the current operation and close after the current file finishes?",
+                QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                self.closing = True
+                self.cancel_work()
+            event.ignore()
+            return
+        if not self.closing and self.editor.settings != self.active and not self.discard_draft():
+            event.ignore()
+            return
+        self.persist()
+        event.accept()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

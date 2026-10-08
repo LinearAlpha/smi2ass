@@ -1,8 +1,9 @@
-# Built in modules
+"""CLI argument handling; conversion and ASS formatting live in the shared API."""
+
 import argparse
 from pathlib import Path
 
-# Custom made modules
+# Package launches use the published version; direct source execution has a fallback.
 if __package__:
     from . import __version__
     from .smi2ass import smi2ass
@@ -12,6 +13,11 @@ else:
 
 
 def cmd_arg() -> argparse.ArgumentParser:
+    """Describe CLI options and resolve invocation-time output defaults.
+
+    Returns:
+        argparse.ArgumentParser: Parser defining the public CLI and its defaults.
+    """
     parser = argparse.ArgumentParser(
         prog="smi2ass",
         description="Converting SAMI (SMI) into Advanced SubStation Alpha (ASS) subtitle",
@@ -80,20 +86,17 @@ def cmd_arg() -> argparse.ArgumentParser:
 
 
 def update_style(obj: smi2ass, args: argparse.Namespace) -> None:
-    """Updating ASS header style based on the user inputs
+    """Apply explicit style overrides to the converter used for the whole batch.
 
     Args:
-        obj (smi2ass): smi2ass class object, if I'm right since this is objec,
-        it will be pass bt reference
-        args (argparse.Namespace): Input arguments
+        obj (smi2ass): Converter whose batch-wide style settings will be changed.
+        args (argparse.Namespace): Parsed CLI options; normalization also updates
+            output_dir and font.
     """
 
-    # It removes first character of the string
+    # Legacy normalization removes one leading space, rather than stripping a path.
     remove_first_char = lambda s: s[:0] + "" + s[1:]
 
-    # In case when there is white space in the front of string, it causes when
-    # program is making new directory for converted output. Thus, it need to
-    # remove it
     if args.output_dir[0] == " ":
         args.output_dir = remove_first_char(args.output_dir)
 
@@ -101,7 +104,7 @@ def update_style(obj: smi2ass, args: argparse.Namespace) -> None:
         obj.update_title(args.title)
 
     if args.font != None:  # Update font
-        # To prevent error when it is playing on the video player
+        # Apply the same leading-space convention to font names.
         if args.font[0] == " ":
             args.font = remove_first_char(args.font)
         obj.update_font_name(args.font)
@@ -109,7 +112,7 @@ def update_style(obj: smi2ass, args: argparse.Namespace) -> None:
     if args.font_size != None:  # update font size
         obj.update_font_size(args.font_size)
 
-    # Updating resolution
+    # A canvas override requires both dimensions; partial input keeps the defaults.
     if (args.resolution_x != None) and (args.resolution_y != None):
         obj.update_res(res_x=args.resolution_x, res_y=args.resolution_y)
     elif (args.resolution_x != None and args.resolution_y == None) or (
@@ -127,13 +130,19 @@ def update_style(obj: smi2ass, args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    """Configure one converter, then process each input with the same style/offset.
+
+    Raises:
+        OSError: An input/settings file cannot be read or an output cannot be written.
+        ValueError: An input has no valid cues after applying its timing offset.
+    """
     parser: argparse.ArgumentParser = cmd_arg()
     args: argparse.Namespace = parser.parse_args()
 
     obj_smi2ass = smi2ass(setting_path=args.settings_dir)
     update_style(obj_smi2ass, args)
 
-    # Check if user gave time offset
+    # Preserve CLI precedence: --add_time wins when both offset options are supplied.
     if args.add_time != None or args.sub_time != None:
         time_offset: int
         if args.add_time != None:
@@ -141,9 +150,9 @@ def main() -> None:
         else:
             time_offset = args.sub_time * -1
 
-        # Update time offset
         obj_smi2ass.set_time_offset(time_offset)
 
+    # Loading each input clears cue/language state while retaining batch settings.
     for tmp_file_name in args.file_name:
         obj_smi2ass.to_ass(tmp_file_name).save(args.output_dir)
 

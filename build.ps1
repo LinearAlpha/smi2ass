@@ -1,5 +1,11 @@
 #requires -Version 5.1
-# Build and verify the Python distributions and Windows executable archives.
+# Build and verify Python distributions and selected Windows executables.
+param(
+    [ValidateSet('cli', 'gui', 'all')]
+    [string]$Target = 'all',
+    [switch]$Clean,
+    [switch]$CleanOnly
+)
 $ErrorActionPreference = 'Stop'
 
 if ([Environment]::OSVersion.Platform -ne 'Win32NT') {
@@ -47,6 +53,15 @@ try {
         throw 'Install Python 3.14 x86-64 with python or py available on PATH, then rerun build.ps1.'
     }
 
+    # CleanOnly exits before creating the venv or installing build dependencies.
+    if ($Clean -or $CleanOnly) {
+        & $BootstrapPython @BootstrapArgs -I scripts/clean_project.py
+        if ($LASTEXITCODE -ne 0) {
+            throw "Project cleanup failed (exit code ${LASTEXITCODE})."
+        }
+    }
+    if ($CleanOnly) { return }
+
     $script:BuildPython = Join-Path $PSScriptRoot '.build-venv\Scripts\python.exe'
     if (Test-Path -LiteralPath '.build-venv') {
         if (!(Test-Path -LiteralPath $script:BuildPython -PathType Leaf)) {
@@ -64,7 +79,8 @@ try {
     }
 
     Invoke-BuildPython -I -m pip --isolated install -r requirements-build.txt
-    Invoke-BuildPython -I -m pip --isolated install --force-reinstall .
+    $Project = if ($Target -eq 'cli') { '.' } else { '.[gui]' }
+    Invoke-BuildPython -I -m pip --isolated install --force-reinstall $Project
     Invoke-BuildPython -I -m pip --isolated check
     # Remove only this project's old Python artifacts before building the new pair.
     if (Test-Path -LiteralPath 'dist') {
@@ -80,13 +96,16 @@ try {
         throw 'Expected one wheel and one source distribution in dist.'
     }
     Invoke-BuildPython -I -m twine check --strict @artifacts
-    Invoke-BuildPython -I scripts/check_distributions.py
-    Invoke-BuildPython -I scripts/build_executable.py
-    Invoke-BuildPython -I scripts/package_assets.py
+    $DistributionOptions = @()
+    if ($Target -ne 'cli') { $DistributionOptions += '--gui' }
+    Invoke-BuildPython -I scripts/check_distributions.py @DistributionOptions
+    Invoke-BuildPython -I scripts/build_executable.py --target $Target
+    Invoke-BuildPython -I scripts/package_assets.py --target $Target
 
-    Write-Host 'Build complete: wheel/source distributions in dist; executable ZIP/7z archives in release-assets.'
+    Write-Host "Build complete ($Target): wheel/source distributions in dist; executable ZIP/7z archives in release-assets."
 } finally {
     $env:PYTHONHOME = $OriginalPythonHome
     $env:PYTHONPATH = $OriginalPythonPath
     Pop-Location
 }
+

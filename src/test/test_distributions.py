@@ -17,7 +17,10 @@ SMOKE = ROOT / "scripts" / "smoke_test.py"
 
 
 class DistributionCheckTest(unittest.TestCase):
+    """Reproduce polluted builds without downloading runtime dependencies."""
+
     def test_installs_artifact_despite_inherited_same_version_metadata(self):
+        """Verify checkout metadata and pip options cannot divert installation."""
         checker = runpy.run_path(str(CHECKER))
         check_distribution = checker["check_distribution"]
         with tempfile.TemporaryDirectory() as directory:
@@ -31,6 +34,8 @@ class DistributionCheckTest(unittest.TestCase):
             (checkout / "smi2ass" / "__init__.py").write_text(
                 "raise RuntimeError('Imported checkout instead of artifact')\n")
             wheel = root / "smi2ass-1.5-py3-none-any.whl"
+            # This dependency-free synthetic wheel tests installer isolation, not release content.
+            # Keep its 1.5 version paired with the deliberately conflicting checkout metadata.
             files = {
                 "smi2ass/__init__.py": "def main():\n    print('smi2ass 1.5')\n",
                 "smi2ass/__main__.py": "from . import main\nmain()\n",
@@ -44,6 +49,7 @@ class DistributionCheckTest(unittest.TestCase):
                 for name, content in files.items():
                     archive.writestr(name, content)
             scripts = root / "scripts"
+            # Verify both module and console entry points resolve inside the fresh environment.
             scripts.mkdir()
             (scripts / "smoke_test.py").write_text(
                 "import argparse, pathlib, subprocess, sys\n"
@@ -67,6 +73,7 @@ class DistributionCheckTest(unittest.TestCase):
             self.assertFalse((root / "wrong-target").exists())
 
     def test_failed_smoke_command_displays_cli_output(self):
+        """Verify failed CLI smoke commands expose original stdout and stderr."""
         error = subprocess.CalledProcessError(
             1, [sys.executable, "-m", "smi2ass"],
             output="CLI stdout\n", stderr="Original CLI failure\n")

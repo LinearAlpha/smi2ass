@@ -1,3 +1,18 @@
+# Unreleased
+
+- Use all available logical CPUs for CLI/GUI compilation instead of limiting Nuitka to two parallel jobs; print the selected job count.
+
+- Add clean-before-build and cleanup-only options to the Windows/Linux build scripts. Remove generated outputs, metadata, and caches while preserving source, settings, subtitles, and virtual environments. Verify cleanup in CI.
+
+- Expand `lan_code.json` to 184 languages with ISO code and selected regional SAMI aliases. Preserve existing language codes and unknown fallback; fix case-insensitive `EnglishSC` recognition.
+
+- Add a native desktop GUI with Convert and ASS Settings tabs, drag-and-drop/folder input, background batch conversion, timing offsets, progress, cancellation, and per-file errors.
+- Add a live illustrative style preview, editable ASS settings, persistent presets, and compatible JSON import/export. Require confirmation before replacing existing output files and detect duplicate output names.
+- Keep Qt optional for Python CLI installations; add the `smi2ass-gui` launcher and build separate `smi2ass-gui` Windows/Linux archives. Test the GUI on Python 3.14 and in both extracted archive formats.
+- Add CLI/GUI/all targets to `build.sh` and `build.ps1`; independently build and verify each native target in CI. Share build naming, version metadata, and smoke-test helpers.
+- Add persistent Light/Dark themes with consistent control icons and palettes.
+- Write the selected ASS style name into dialogue events, handle Unicode paths in legacy Windows consoles, report files with no usable subtitle cues, retain cues starting at zero, and carry timestamp rounding into the next second.
+
 # V1.5.1
 
 ## Fixes and improvements
@@ -139,3 +154,4 @@ Proceed only when PowerShell prints `Verified: <filename>` or Linux/macOS prints
 Thanks to @LinearAlpha for maintenance, the class-based converter, configurable ASS styling, CLI/time offsets, and regression CI; @najoan125 for the color fix and charset-normalizer migration; and the original upstream projects by @hojel and @trustin.
 
 [Full changelog](https://github.com/LinearAlpha/smi2ass/compare/V1.4.5...V1.5)
+
