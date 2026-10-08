@@ -1,45 +1,71 @@
-# V1.5.1
+# V2
 
-## Fixes and improvements
+V2 (package version **2.0**) adds a desktop interface to the SAMI-to-ASS converter while keeping the existing CLI commands available.
 
-- Fix local distribution checks that could skip the wheel when inherited package metadata made it appear already installed. Force installation of the selected artifact and isolate Python, pip, and console checks from the calling environment.
-- Show captured CLI stdout/stderr when smoke tests fail, so the underlying error is visible.
-- Add `build.sh` for Linux x86-64 and `build.ps1` for Windows x86-64. Each script sets up `.build-venv`, builds and verifies wheel/source distributions, compiles the executable, and tests the ZIP/7z archives. CI runs these same scripts.
-- Build packages and executables with Python 3.14 and pin Linux CI jobs to Ubuntu 26.04. Regression tests still cover Python 3.11–3.14 on Windows and Linux.
-- List all seven release assets and provide SHA-256 verification commands for Windows PowerShell, Linux, and macOS.
+## Desktop interface
 
-## Compatibility
+- **Convert:** add files, drag and drop SAMI subtitles, or scan folders; select inputs, choose an output folder/preset, and adjust timing in milliseconds. Background batch conversion includes progress, cancellation between files, and per-file error details.
+- **ASS Settings:** edit fonts, emphasis, four colors and opacity, outline/shadow, alignment, margins, and canvas size. Advanced options cover scaling, spacing, rotation, encoding, script title, timer, and collision handling.
+- Preview style changes immediately, save named presets, and import/export settings compatible with the CLI's JSON format. The preview is illustrative; final rendering depends on the player's ASS renderer and installed fonts.
+- Choose persistent **Light** or **Dark** themes. Confirm replacement of existing output files; conflicting output names are blocked.
+- Launch the desktop program as `smi2ass-gui`. Windows GUI executables open without a console.
 
-Python source/package installations require **Python 3.11 or later**. The local build scripts require **Python 3.14 x86-64** and a native C compiler. Standalone executables do not require Python; Windows and Linux archives target x86-64.
+[Program screenshots](https://github.com/LinearAlpha/smi2ass#screenshots)
 
-**Linux build baseline:** V1.5.1 binaries are built and tested on Ubuntu 26.04, replacing the Ubuntu 22.04 baseline used for V1.5. Compatibility with older Linux distributions has not been verified.
+## Conversion, builds, and maintenance
 
-Default CLI output remains `./out`. Single-language output is `name.ass`; multilingual output is `name-ENG.ass`, `name-KOR.ass`, etc. For custom settings, use `--settings-dir PATH`. Executable archives retain an editable `setting` folder beside the executable.
+- Expand language mapping to 184 languages and 843 class aliases, including ISO code variants and selected regional SAMI classes. Preserve existing output codes and unknown fallback; fix case-insensitive `EnglishSC` recognition.
+- Write the selected ASS style name into Dialogue events, preserve zero-start cues, and round timing correctly across second boundaries. Report unusable inputs and support Unicode paths in legacy Windows consoles.
+- Build separate CLI/GUI executables and archives with `build.sh` and `build.ps1`; both targets are built by default. Add clean-before-build and cleanup-only modes, and use all available logical CPUs during compilation.
+- Verify installed distributions, GUI behavior, native executables, and both extracted archive formats in CI. Include real screenshots with the README in source/native archives.
+- Add consistent Google-style docstrings to all functions and classes for easier maintenance.
 
-## Downloads
+## Compatibility and installation
 
-Use the ZIP or 7z archive for your OS and extract the entire archive. Keep the `setting` directory beside the executable. Python users can install the attached wheel with `python -m pip install smi2ass-1.5.1-py3-none-any.whl`. Packages are attached to this GitHub release; no PyPI publication is implied.
+Standalone Windows/Linux **x86-64** executables do not require Python. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside its executable. Linux binaries are built and tested on **Ubuntu 26.04**; compatibility with older Linux distributions has not been verified. Linux GUI usage requires a desktop session and the Qt runtime libraries listed in the README.
 
-`SHA256SUMS.txt` covers all six distributions. Executable archives include `BUILD-INFO.json` with the source commit, Python version, platform, and installed build/runtime dependencies.
+Python installations require **Python 3.11 or later**. The GUI extra is optional; the CLI keeps its existing commands, settings format, timing flags, and default `./out` folder. Python GUI installations also work on macOS. Local native builds use **Python 3.14 x86-64** and a C compiler.
 
-### V1.5.1 assets and SHA-256 verification
+Install the downloaded wheel for the CLI:
 
-The [V1.5.1 release](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5.1) has seven assets:
+```shell
+python -m pip install smi2ass-2.0-py3-none-any.whl
+smi2ass --version
+```
 
-- `SHA256SUMS.txt` (checksums for the six distributions below)
-- `smi2ass-1.5.1-py3-none-any.whl`
-- `smi2ass-1.5.1.tar.gz`
+Or install the GUI extra:
+
+```shell
+python -m pip install "./smi2ass-2.0-py3-none-any.whl[gui]"
+smi2ass-gui
+```
+
+These packages are attached to GitHub Releases; no PyPI publication is implied.
+
+## Assets and SHA-256 verification
+
+The prepared V2 release contains eleven assets:
+
+- `SHA256SUMS.txt` (checksums for the ten distributions below)
+- `smi2ass-2.0-py3-none-any.whl`
+- `smi2ass-2.0.tar.gz`
 - `smi2ass_linux_x86-64.7z`
 - `smi2ass_linux_x86-64.zip`
 - `smi2ass_windows_x86-64.7z`
 - `smi2ass_windows_x86-64.zip`
+- `smi2ass-gui_linux_x86-64.7z`
+- `smi2ass-gui_linux_x86-64.zip`
+- `smi2ass-gui_windows_x86-64.7z`
+- `smi2ass-gui_windows_x86-64.zip`
 
-Download `SHA256SUMS.txt` and your chosen distribution from that release into the same directory. Run the following there before extracting or installing, replacing the example filename with your downloaded asset's exact name.
+Choose the `smi2ass-gui` archive for the desktop program or `smi2ass` for the CLI. Every native archive includes editable settings and `BUILD-INFO.json` identifying its target, source commit, Python version, and dependencies.
+
+Download `SHA256SUMS.txt` and your chosen distribution into the same directory. Verify it there before extracting/installing, replacing the example filename with your asset's exact name.
 
 **Windows PowerShell:**
 
 ```powershell
-$file = 'smi2ass_windows_x86-64.zip'
+$file = 'smi2ass-gui_windows_x86-64.zip'
 $line = Get-Content .\SHA256SUMS.txt | Where-Object { $_.EndsWith("  $file") }
 if (!$line) { throw "No checksum for $file" }
 $expected = ($line -split '\s+')[0]
@@ -52,17 +78,17 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash -ne $expected) {
 **Linux:**
 
 ```sh
-file='smi2ass_linux_x86-64.zip'
+file='smi2ass-gui_linux_x86-64.zip'
 awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | sha256sum -c -
 ```
 
-**macOS:**
+**macOS (wheel):**
 
 ```sh
-file='smi2ass-1.5.1-py3-none-any.whl'
+file='smi2ass-2.0-py3-none-any.whl'
 awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | shasum -a 256 -c -
 ```
 
-Proceed only when PowerShell prints `Verified: <filename>` or Linux/macOS prints `<filename>: OK`. A mismatch, missing file, or missing checksum is a verification failure.
+Proceed when PowerShell prints `Verified: <filename>` or Linux/macOS prints `<filename>: OK`. A mismatch, missing file, or missing checksum is a verification failure.
 
-[Full changelog](https://github.com/LinearAlpha/smi2ass/compare/V1.5...V1.5.1)
+[Full changelog](https://github.com/LinearAlpha/smi2ass/compare/V1.5.1...V2)

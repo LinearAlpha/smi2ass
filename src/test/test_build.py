@@ -58,6 +58,9 @@ class BuildTargetTest(unittest.TestCase):
             root = Path(directory)
             for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):
                 (root / filename).write_text(filename)
+            screenshots = root / "docs" / "screenshots"
+            screenshots.mkdir(parents=True)
+            (screenshots / "convert-light.png").write_bytes(b"screenshot fixture")
             for target in ("cli", "gui"):
                 folder = root / "build" / target
                 (folder / "setting").mkdir(parents=True)
@@ -77,6 +80,7 @@ class BuildTargetTest(unittest.TestCase):
                 self.assertEqual(target, binary.read_text())
                 self.assertEqual(build_common.executable_name(target), binary.name)
                 self.assertEqual("{}", (binary.parent / "setting" / "ass_styles.json").read_text())
+                self.assertEqual(b"screenshot fixture", (binary.parent / "docs" / "screenshots" / "convert-light.png").read_bytes())
                 seen.append((target, binary.parent.name))
 
             # Bound decompression memory for these small fixtures, including restricted test hosts.

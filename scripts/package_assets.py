@@ -59,6 +59,10 @@ def package_target(target):
         shutil.copytree(ROOT / "build" / target / "setting", stage / "setting")
         for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):
             shutil.copy2(ROOT / filename, stage / filename)
+        # Keep README screenshot links usable in extracted archives as well as on GitHub.
+        screenshots = ROOT / "docs" / "screenshots"
+        if screenshots.is_dir():
+            shutil.copytree(screenshots, stage / "docs" / "screenshots")
         (stage / "BUILD-INFO.json").write_text(json.dumps(build_info(target), indent=2)+"\n", encoding="utf-8")
         zip_path = shutil.make_archive(str(output / name), "zip", stage)
         seven_zip_path = output / f"{name}.7z"

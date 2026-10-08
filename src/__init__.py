@@ -7,4 +7,4 @@ from . import smi2ass
 from .smi2ass import smi2ass
 from .smi2ass import rgb2bgr
 
-__version__ = "1.5.1"
+__version__ = "2.0"

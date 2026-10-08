@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smi2ass"
-version = "1.5.1"
-description = "A command-line SAMI to SSA/ASS subtitle converter"
+version = "2.0"
+description = "A desktop and command-line SAMI to SSA/ASS subtitle converter"
 requires-python = ">=3.11"
 readme = "README.md"
 license-files = ["LICENSE.txt"]
@@ -39,4 +39,7 @@ package-dir = { smi2ass = "src" }
 
 [tool.setuptools.package-data]
 smi2ass = ["setting/*.json", "setting/*.txt", "gui_icons/*.svg"]
+
+[tool.smi2ass.release]
+tag = "V2"
 

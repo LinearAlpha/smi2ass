@@ -128,13 +128,15 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish tested release
+    name: Prepare or publish tested release
     needs: [test, package, gui, executable]
-    # A release commit on main is explicit publication intent. Normal pushes and
-    # pull requests only build/test; manual publication is also available.
+    # Preparation commits create a draft; release commits explicitly publish it.
+    # Normal pushes and pull requests only build/test.
     if: >-
       github.ref == 'refs/heads/main' &&
-      ((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: V')) ||
+      ((github.event_name == 'push' &&
+        (startsWith(github.event.head_commit.message, 'release: V') ||
+         startsWith(github.event.head_commit.message, 'prepare release: V'))) ||
        (github.event_name == 'workflow_dispatch' && inputs.publish))
     runs-on: ubuntu-26.04
     permissions:
@@ -154,8 +156,9 @@ jobs:
         run: |
           python - <<'PY'
           import hashlib, os, pathlib, tomllib
-          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
-          tag = 'V' + version
+          metadata = tomllib.loads(pathlib.Path('pyproject.toml').read_text())
+          version = metadata['project']['version']
+          tag = metadata.get('tool', {}).get('smi2ass', {}).get('release', {}).get('tag', 'V' + version)
           notes = pathlib.Path('RELEASE_NOTES.md').read_text()
           assert notes.startswith('# ' + tag + '\n'), 'Release notes and metadata disagree'
           files = sorted(pathlib.Path('release-assets').iterdir())
@@ -170,10 +173,12 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'tag={tag}\n')
           PY
-      - name: Create draft, upload assets, and publish
+      - name: Create draft, upload assets, and optionally publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PUBLISH_RELEASE: >-
+            ${{ (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release: V')) || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
@@ -183,5 +188,7 @@ jobs:
           gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --notes-file RELEASE_NOTES.md --draft
           gh release upload "$RELEASE_TAG" release-assets/*
           test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" = 11
-          gh release edit "$RELEASE_TAG" --draft=false --latest
+          if [ "$PUBLISH_RELEASE" = "true" ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi
 

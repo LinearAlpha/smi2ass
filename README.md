@@ -1,8 +1,31 @@
 # smi2ass
 
-`smi2ass` converts SAMI (`.smi`) subtitles to SSA/ASS (SubStation Alpha), including separate output files for multiple languages.
+`smi2ass` converts SAMI (`.smi`) subtitles to SSA/ASS (SubStation Alpha) with a desktop GUI and command-line interface, including separate output files for multiple languages.
+
+## Screenshots
+
+**Convert:** queue files, choose a preset, and adjust subtitle timing.
+
+![smi2ass Convert tab in the light theme, with English, Korean, and bilingual inputs](docs/screenshots/convert-light.png)
+
+**ASS Settings:** edit fonts, colors, opacity, alignment, and margins with a live preview.
+
+![smi2ass ASS Settings tab in the light theme, showing the Cinema style and live preview](docs/screenshots/ass-settings-light.png)
+
+<details>
+<summary>View the dark theme</summary>
+
+![smi2ass Convert tab in the dark theme](docs/screenshots/convert-dark.png)
+
+![smi2ass ASS Settings tab in the dark theme](docs/screenshots/ass-settings-dark.png)
+
+</details>
+
+Screenshots show the running desktop interface with sample subtitle files. The preview is illustrative; final subtitle rendering depends on your video player.
 
 ## Download or install
+
+**V2 (package version 2.0) is being prepared for release**, with separate GUI and CLI downloads. See [V2 release notes](RELEASE_NOTES.md) for its features, planned assets, and verification commands. Until V2 is published, the current stable download below provides the CLI.
 
 [Download V1.5.1](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5.1) for **Windows x86-64** or **Linux x86-64**. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. V1.5.1 Linux binaries are built and tested on Ubuntu 26.04.
 
@@ -122,7 +145,7 @@ The converter handles paragraph, line-break, bold, italic, underline, strike-thr
 
 The converter prints the file being processed and diagnostic fragments for malformed language or time tags. For example, a misspelled `Start` attribute can produce `Failed to extract time code`. Correct the `.smi` file and run the conversion again.
 
-## Desktop GUI (development)
+## Desktop GUI
 
 The desktop interface in this checkout has **Convert** and **ASS Settings** tabs. Install the optional GUI dependency in your virtual environment and launch it:
 
@@ -147,7 +170,14 @@ sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 
 
 Existing output files require confirmation before replacement. Sources that would produce the same output filename are marked as errors; convert them to different folders. Timing offsets can discard cues shifted before the start of the video, following the existing converter behavior.
 
-The GUI is a development addition and is not included in the published V1.5.1 assets. Builds from this checkout provide separate CLI and GUI archives. GUI binaries use `smi2ass-gui` (`smi2ass-gui.exe` on Windows). The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives remain Windows/Linux x86-64.
+V2 provides separate CLI and GUI archives; the published V1.5.1 assets contain only the CLI. GUI binaries use `smi2ass-gui` (`smi2ass-gui.exe` on Windows). The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives target Windows/Linux x86-64.
+
+After downloading the V2 wheel, install its optional GUI extra with:
+
+```shell
+python -m pip install "./smi2ass-2.0-py3-none-any.whl[gui]"
+smi2ass-gui
+```
 
 To run the GUI checks with the extra installed:
 
@@ -227,7 +257,9 @@ Wheel/source distributions are written to `dist`; executables are written to `bu
 
 Each archive contains its corresponding executable, editable settings, documentation, and `BUILD-INFO.json`. Nuitka requires a native C compiler (GCC on Linux or a supported Windows compiler); Linux additionally uses `patchelf`. `scripts/build_executable.py` uses the active Python environment and is the authoritative standalone/one-file build configuration.
 
-To prepare a release, update the project and CLI versions together, update `RELEASE_NOTES.md` and `CHANGELOG.md`, and merge a commit titled `release: V<version>` into `main`. The CI workflow publishes only after all test, package, and executable jobs succeed. It creates a draft, uploads the wheel/source distributions and eight CLI/GUI archives plus SHA-256 checksums (11 assets total), then publishes. Ordinary commits and PRs only validate artifacts. An existing release is never overwritten. Maintainers may also run CI manually on `main` with `publish` enabled.
+To prepare a release, update the project/CLI versions together, the `tool.smi2ass.release.tag` in `pyproject.toml`, and both release documents. A commit titled `prepare release: V2` on `main` builds and verifies the artifacts, then creates a **draft** with the wheel/source distributions, eight CLI/GUI archives, and SHA-256 checksums (11 assets total). Publish that prepared draft from GitHub Releases when ready.
+
+For a new release that should publish automatically after verification, use a commit titled `release: V<version>` or run CI manually on `main` with `publish` enabled. All test, package, GUI, and executable jobs must succeed first. Ordinary commits and PRs only validate artifacts. An existing release is never overwritten.
 
 See [release notes](RELEASE_NOTES.md) and [the changelog](CHANGELOG.md).
 

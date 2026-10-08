@@ -64,7 +64,7 @@ def main() -> None:
                 print(error.stderr, end="", file=sys.stderr)
                 raise
 
-        assert run("--version").stdout.strip() == "smi2ass 1.5.1"
+        assert run("--version").stdout.strip() == "smi2ass 2.0"
         assert "--settings-dir" in run("--help").stdout
         english = root / "English sample.smi"
         english.write_text(sample("Red text"), encoding="utf-8-sig")

@@ -1,4 +1,10 @@
-# Unreleased
+# V2
+
+Package version: **2.0**. GitHub release tag: **V2**.
+
+- Show real light/dark screenshots of the Convert and ASS Settings screens on the repository homepage and include them in source/native archives.
+- Document all functions and classes with Google-style docstrings, including parameter, return, exception, and attribute sections where applicable.
+- Add verified draft-release preparation in CI; publication remains a separate explicit action.
 
 - Use all available logical CPUs for CLI/GUI compilation instead of limiting Nuitka to two parallel jobs; print the selected job count.
 
