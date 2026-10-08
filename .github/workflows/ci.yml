@@ -94,6 +94,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-26.04, windows-latest]
+        # Separate target jobs keep the CLI build independent of optional Qt.
         target: [cli, gui]
     steps:
       - uses: actions/checkout@v6
@@ -147,6 +148,7 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+      # Publish only the complete expected artifact set, with checksums for every file.
       - name: Check version and write checksums
         id: version
         run: |

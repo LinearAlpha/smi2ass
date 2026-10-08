@@ -236,6 +236,7 @@ class smi2ass(AssStyle):
                 self.log(f"Failed to extract time code: \n\n{lines}\n")
 
             # Adjust subtitle timecode based on the offset input
+            # Zero is a valid cue start; invalid timestamps must not be revived by an offset.
             if self.flag_time_offset and time_code >= 0:
                 time_code += self.time_offset
 
@@ -397,6 +398,7 @@ class smi2ass(AssStyle):
             # Removes next line character to avoid error when it sets loading
             contents = re.sub("\n", "", contents, len(contents) - 1)
 
+            # Dialogue records must reference the selected style name in [V4+ Styles].
             # Only add converted line when there is content
             if len(contents.strip()) != 0:
                 tmp_ass_lines.append(

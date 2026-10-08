@@ -44,6 +44,7 @@ def card(title=""):
 
 
 class ColorControl(QWidget):
+    """Present an ASS color as an RGB swatch and a user-facing opacity percentage."""
     changed = Signal(str)
 
     def __init__(self):
@@ -66,6 +67,7 @@ class ColorControl(QWidget):
         rgb, opacity = color_to_rgb(value)
         self.swatch.setText(rgb)
         self.swatch.setStyleSheet(f"QPushButton {{ border-left: 12px solid {rgb}; }}")
+        # Updating the spinbox from an ASS value must not emit another color edit.
         self.opacity.blockSignals(True)
         self.opacity.setValue(opacity)
         self.opacity.blockSignals(False)
@@ -82,6 +84,7 @@ class ColorControl(QWidget):
 
 
 class SettingsEditor(QWidget):
+    """Edit a settings draft and update its preview without applying it to conversion."""
     changed = Signal(dict)
 
     def __init__(self, settings):
@@ -226,6 +229,7 @@ class SettingsEditor(QWidget):
         self.set_settings(settings)
 
     def register(self, widget, section, key):
+        # Bind controls to the JSON section/key used by import, export, and reset.
         widget.setObjectName(key)
         self.controls[(section,key)] = widget
 
@@ -252,6 +256,7 @@ class SettingsEditor(QWidget):
         self.changed.emit(deepcopy(self.settings))
 
     def set_settings(self, settings):
+        # Signals still fire while populating controls; the loading guard ignores them.
         self.loading = True
         self.settings = deepcopy(settings)
         for (section,key), control in self.controls.items():

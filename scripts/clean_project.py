@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
+# Clean only known project outputs; never infer deletions from arbitrary untracked files.
 GENERATED = (
     "build", "dist", "release-assets", "smi2ass.egg-info", "src/smi2ass.egg-info",
     "__pycache__", ".pytest_cache", "nuitka-crash-report.xml",
@@ -17,6 +18,7 @@ def is_link(path):
 
 
 def remove_generated(path):
+    """Remove an output or its link without traversing a linked destination."""
     if path.is_symlink():
         path.unlink()
     elif getattr(path, "is_junction", lambda: False)():
@@ -31,6 +33,7 @@ def remove_generated(path):
 
 
 def clean_project(root=ROOT):
+    """Return removed paths relative to the project root; repeated cleanup is harmless."""
     root = Path(root).resolve()
     removed = []
     for name in GENERATED:
@@ -44,6 +47,7 @@ def clean_project(root=ROOT):
         folder = root / name
         if is_link(folder):
             continue
+        # Prune linked folders and virtual environments before descending into caches.
         for current, directories, _ in os.walk(folder, followlinks=False):
             for directory in list(directories):
                 path = Path(current) / directory

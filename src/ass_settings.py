@@ -24,6 +24,7 @@ class AssStyle:
         self.setting_path: Path
         if setting_path == "":
             self.setting_path = Path(__file__).resolve().parent / "setting"
+            # Compiled releases prefer editable settings beside the executable.
             if is_nuitka():
                 external = Path(sys.argv[0]).resolve().parent / "setting"
                 if external.is_dir():
@@ -109,6 +110,7 @@ class AssStyle:
             exist, it will return "und" as unknown
         """
 
+        # Class aliases share one output language code for grouping and filename suffixes.
         try:
             return self.lan_code[tmp_lang_code.upper()]
         except:
@@ -146,7 +148,7 @@ class AssStyle:
 
     def update_res(self, res_x: int, res_y: int) -> None:
         """To update resolution information of the video. It is default to
-        FullHD (1980 x 1080) resolution in the json file
+        FullHD (1920 x 1080) resolution in the json file
 
         Args:
             res_x (int): Horizontal size of the screen

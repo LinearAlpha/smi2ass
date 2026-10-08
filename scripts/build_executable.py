@@ -16,8 +16,10 @@ CLI_EXCLUSIONS = (
 
 
 def build_target(target):
+    """Compile one target, copy editable defaults beside it, and verify the result."""
     output = ROOT / "build" / target
     output.mkdir(parents=True, exist_ok=True)
+    # Python 3.14 respects CPU affinity; older interpreters use the host CPU count.
     jobs = getattr(os, "process_cpu_count", os.cpu_count)() or 1
     print(f"Compiling {target.upper()} with {jobs} parallel jobs.", flush=True)
     command = [
@@ -33,6 +35,7 @@ def build_target(target):
             command.append("--windows-console-mode=disable")
         entry = "gui_standalone.py"
     else:
+        # Keep optional Qt modules out of the standalone CLI, even if installed locally.
         command.append("--nofollow-import-to=" + ",".join(CLI_EXCLUSIONS))
         entry = "standalone.py"
     command.append(str(ROOT / "scripts" / entry))
@@ -48,6 +51,7 @@ def build_target(target):
 
 
 def main():
+    # Build targets sequentially because each compiler already uses all available CPUs.
     for target in selected_targets():
         build_target(target)
 

@@ -7,11 +7,13 @@ from . import __version__
 
 
 def main(argv=None):
+    """Parse launch options, load optional Qt, and start the desktop event loop."""
     parser = argparse.ArgumentParser(description="smi2ass desktop subtitle converter")
     parser.add_argument("files", nargs="*", help="SAMI files to add to the conversion queue")
     parser.add_argument("--version", action="version", version=f"smi2ass GUI {__version__}")
     parser.add_argument("--smoke-test", metavar="REPORT", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    # Parse --version before importing Qt so CLI-only installations can still report it.
     try:
         from PySide6.QtWidgets import QApplication
         from .gui import MainWindow, apply_theme

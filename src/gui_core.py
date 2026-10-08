@@ -12,11 +12,13 @@ from .smi2ass import smi2ass
 
 
 def default_settings():
+    """Return an independent copy of the bundled ASS configuration."""
     return deepcopy(AssStyle().ass_style)
 
 
 def validate_settings(value):
     """Return a complete, ordered ASS configuration or reject invalid imports."""
+    # Start with defaults so style fields retain the converter's serialization order.
     defaults = default_settings()
     if not isinstance(value, dict):
         raise ValueError("Settings must be a JSON object with ScriptInfo and style sections.")
@@ -28,6 +30,7 @@ def validate_settings(value):
             raise ValueError(f"Unsupported {section} fields: {', '.join(sorted(unknown))}")
         defaults[section].update(value[section])
     style, info = defaults["style"], defaults["ScriptInfo"]
+    # ASS style records are comma-separated; these names must remain single fields.
     for key in ("Name", "Fontname"):
         if not isinstance(style[key], str) or not style[key].strip() or any(c in style[key] for c in ",\r\n"):
             raise ValueError(f"{key} must be nonempty and cannot contain commas or line breaks.")
@@ -74,11 +77,13 @@ def validate_settings(value):
 
 
 def color_to_rgb(value):
+    """Decode ASS AABBGGRR into an RGB hex color and a 0–100 opacity value."""
     alpha, blue, green, red = (int(value[index:index + 2], 16) for index in (2, 4, 6, 8))
     return f"#{red:02X}{green:02X}{blue:02X}", round((255 - alpha) * 100 / 255)
 
 
 def rgb_to_color(rgb, opacity):
+    """Encode RGB and opacity as ASS AABBGGRR (alpha 0 means fully opaque)."""
     if not re.fullmatch(r"#[0-9a-fA-F]{6}", rgb) or not 0 <= opacity <= 100:
         raise ValueError("Invalid color or opacity.")
     alpha = round(255 * (1 - opacity / 100))
@@ -86,8 +91,10 @@ def rgb_to_color(rgb, opacity):
 
 
 def write_json(path, value):
+    """Write UTF-8 JSON through a temporary sibling and atomic replacement."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # A sibling keeps replacement on the same filesystem; close it first on Windows.
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as file:
         temporary = Path(file.name)
         json.dump(value, file, ensure_ascii=False, indent=2)
@@ -99,6 +106,7 @@ def write_json(path, value):
 
 
 class PresetStore:
+    """Persist applied styles, named presets, and UI preferences in one JSON file."""
     def __init__(self, path):
         self.path = Path(path)
         self.active = default_settings()
@@ -111,6 +119,7 @@ class PresetStore:
             try:
                 data = json.loads(self.path.read_text(encoding="utf-8"))
                 self.active = validate_settings(data["active"])
+                # Default stays tied to bundled settings, even after importing older preferences.
                 self.presets.update({name: validate_settings(settings) for name, settings in data["presets"].items() if name != "Default"})
                 self.output = str(data.get("output", self.output))
                 self.open_output = bool(data.get("open_output", False))
@@ -127,6 +136,7 @@ class PresetStore:
 
 @dataclass
 class Source:
+    """Queue metadata shared between worker threads and the desktop window."""
     path: Path
     languages: tuple[str, ...] = ()
     encoding: str = ""
@@ -134,6 +144,7 @@ class Source:
 
 
 def inspect_source(path):
+    """Detect encoding and language groups without creating output files."""
     path = Path(path).resolve()
     try:
         converter = smi2ass(str(path), verbose=False)
@@ -144,12 +155,14 @@ def inspect_source(path):
 
 @dataclass
 class Prepared:
+    """Hold ASS text in memory until conflicts and overwrites have been reviewed."""
     source: Source
     outputs: dict[str, str] = field(default_factory=dict)
     error: str = ""
 
 
 def prepare_source(source, settings, offset=0):
+    """Convert one input into filename/text pairs, retaining errors on its queue row."""
     try:
         converter = smi2ass(verbose=False)
         converter.ass_style = validate_settings(settings)
@@ -167,6 +180,7 @@ def prepare_source(source, settings, offset=0):
 
 
 def conflicting_names(prepared):
+    """Find duplicate output names, including collisions on case-insensitive filesystems."""
     owners = {}
     for item in prepared:
         for filename in item.outputs:

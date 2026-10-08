@@ -57,6 +57,7 @@ class StylePreview(QWidget):
         if not self.settings or not self.text:
             return
         style, info = self.settings["style"], self.settings["ScriptInfo"]
+        # Fit the ASS canvas inside the widget and scale margins/font size consistently.
         canvas_ratio = info["PlayResX"] / info["PlayResY"]
         canvas_width, canvas_height = width, width / canvas_ratio
         if canvas_height > height:
@@ -86,6 +87,7 @@ class StylePreview(QWidget):
         text_path = QTransform().scale(style["ScaleX"]/100, style["ScaleY"]/100).map(text_path)
         bounds = text_path.boundingRect()
         alignment = int(style["Alignment"])
+        # ASS alignment uses numpad positions: 1–3 bottom, 4–6 middle, 7–9 top.
         col, row = (alignment-1)%3, (alignment-1)//3
         x = (origin_x + style["MarginL"]*factor if col == 0 else
              origin_x + (canvas_width-bounds.width())/2 if col == 1 else

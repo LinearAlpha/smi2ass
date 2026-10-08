@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def check_distribution(artifact, gui=False):
+    """Install this exact artifact in a fresh venv and test its declared entry points."""
     # Do not expose the calling checkout or another Python installation to the
     # temporary interpreter or the generated console entry point.
     env = {key: value for key, value in os.environ.items()
@@ -32,6 +33,7 @@ def check_distribution(artifact, gui=False):
         subprocess.run(python_command + [str(ROOT / "scripts" / "smoke_test.py"),
                                         "--executable", str(console)],
                        check=True, cwd=directory, env=env)
+        # Installing the extra exercises Qt and packaged resources from the artifact itself.
         if gui:
             subprocess.run(python_command + [str(ROOT / "scripts" / "smoke_gui.py")],
                            check=True, cwd=directory, env=env)

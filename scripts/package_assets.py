@@ -16,6 +16,7 @@ from build_common import ROOT, archive_name, executable_name, project_version, s
 
 
 def build_info(target):
+    """Record target, commit, runtime, and dependency versions for reproducible reports."""
     return {
         "version": project_version(), "target": target,
         "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(
@@ -26,6 +27,7 @@ def build_info(target):
 
 
 def package_target(target):
+    """Create separate ZIP/7z archives and verify both extracted copies."""
     output = ROOT / "release-assets"
     output.mkdir(exist_ok=True)
     name = archive_name(target)
@@ -33,6 +35,7 @@ def package_target(target):
     with tempfile.TemporaryDirectory() as directory:
         stage = Path(directory) / name
         stage.mkdir()
+        # Each download contains exactly its corresponding program, with shared defaults.
         shutil.copy2(ROOT / "build" / target / executable, stage / executable)
         shutil.copytree(ROOT / "build" / target / "setting", stage / "setting")
         for filename in ("README.md", "LICENSE.txt", "CHANGELOG.md"):

@@ -131,11 +131,13 @@ def apply_theme(app, theme="light"):
         palette.setColor(role, QColor(color))
     for role in (QPalette.ColorRole.Text, QPalette.ColorRole.WindowText, QPalette.ColorRole.ButtonText):
         palette.setColor(QPalette.ColorGroup.Disabled, role, QColor("#80909f" if dark else "#96a1a9"))
+    # CSS does not cover every viewport or popup, so set palette roles as well.
     app.setPalette(palette)
     app.setStyleSheet(DARK_STYLESHEET if dark else STYLESHEET)
 
 
 class Job(QThread):
+    """Run blocking work off the UI thread and report progress through Qt signals."""
     update = Signal(object, str, object)
     result = Signal(object)
     error = Signal(str)
@@ -152,6 +154,7 @@ class Job(QThread):
 
 
 class DropZone(QFrame):
+    """Accept local file URLs and let the window handle scanning and validation."""
     paths = Signal(list)
 
     def __init__(self):
@@ -177,6 +180,7 @@ class DropZone(QFrame):
 
 
 class MainWindow(QMainWindow):
+    """Coordinate the conversion queue, settings draft, and background workers."""
     def __init__(self, config_path=None):
         super().__init__()
         self.setWindowTitle(f"smi2ass · {__version__}")
@@ -185,6 +189,7 @@ class MainWindow(QMainWindow):
         path = config_path or Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation)) / "gui.json"
         self.store = PresetStore(path)
         apply_theme(QApplication.instance(), self.store.theme)
+        # Applied settings are separate from the editor draft until Apply is chosen.
         self.active = deepcopy(self.store.active)
         self.sources = []
         self.jobs = set()
@@ -371,6 +376,7 @@ class MainWindow(QMainWindow):
             return False
 
     def refresh_presets(self):
+        # Refreshing choices must not trigger selection handlers or discard a draft.
         self.preset.blockSignals(True)
         self.preset.clear()
         self.preset.addItem("Custom")
@@ -575,6 +581,7 @@ class MainWindow(QMainWindow):
         self.cancel = threading.Event()
         self.set_busy(True)
         job = Job(work,self.cancel)
+        # Keep QThread alive until finished, even if its result starts the next job.
         self.jobs.add(job)
         job.update.connect(self.handle_update)
         job.result.connect(result)
@@ -595,6 +602,7 @@ class MainWindow(QMainWindow):
         self.show_error(error)
 
     def cancel_work(self):
+        # Workers check this between files so an in-progress write can finish.
         self.cancel.set()
         self.cancel_button.setEnabled(False)
         self.status.setText("Cancelling after the current file…")
@@ -614,9 +622,11 @@ class MainWindow(QMainWindow):
             if answer == QMessageBox.StandardButton.Yes and not self.apply_settings():
                 return
         self.persist()
+        # Snapshot UI values on the main thread; workers only use this copy.
         settings,offset = deepcopy(self.active),self.offset.value()
         self.progress.setRange(0,len(sources)*2)
         self.progress.setValue(0)
+        # Preparation is read-only; filesystem writes start after conflict review.
         def prepare(job):
             prepared = []
             for index,source in enumerate(sources):
@@ -630,6 +640,7 @@ class MainWindow(QMainWindow):
         self.start_job(prepare,self.prepared_done)
 
     def prepared_done(self,prepared):
+        """Review prepared names and confirm overwrites on the UI thread."""
         if self.cancel.is_set() or self.closing:
             self.set_busy(False)
             self.status.setText("Cancelled · no output files written")
@@ -654,6 +665,7 @@ class MainWindow(QMainWindow):
                 self.set_busy(False)
                 self.status.setText("Cancelled · existing files were kept")
                 return
+        # Pass only the exact existing paths approved in the dialog to the writer.
         def save(job):
             written,errors = [], [item.error for item in prepared if item.error]
             for index,item in enumerate(valid):
@@ -677,6 +689,7 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def closeEvent(self,event):
+        # Defer destruction until workers finish; destroying a running QThread is unsafe.
         if self.busy or self.jobs:
             if QMessageBox.question(self,"Cancel and close?","Cancel the current operation and close after the current file finishes?",
                 QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:

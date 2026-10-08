@@ -53,6 +53,7 @@ try {
         throw 'Install Python 3.14 x86-64 with python or py available on PATH, then rerun build.ps1.'
     }
 
+    # CleanOnly exits before creating the venv or installing build dependencies.
     if ($Clean -or $CleanOnly) {
         & $BootstrapPython @BootstrapArgs -I scripts/clean_project.py
         if ($LASTEXITCODE -ne 0) {

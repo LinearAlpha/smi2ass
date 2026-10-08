@@ -34,6 +34,7 @@ if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
     exit 1
 fi
 
+# Ignore the caller's import paths so the build uses its own interpreter and packages.
 unset PYTHONHOME PYTHONPATH
 version_check='import platform, sys; sys.exit(0 if sys.version_info[:2] == (3, 14) and sys.maxsize > 2**32 and platform.machine().lower() in ("amd64", "x86_64") else 1)'
 bootstrap_python=''
@@ -48,6 +49,7 @@ if [[ -z "$bootstrap_python" ]]; then
     exit 1
 fi
 
+# Cleanup happens before venv creation or dependency installation; clean-only exits here.
 if [[ "$clean" == true ]]; then
     "$bootstrap_python" -I scripts/clean_project.py
 fi
