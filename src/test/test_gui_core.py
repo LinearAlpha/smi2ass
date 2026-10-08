@@ -104,7 +104,17 @@ class GuiCoreTest(unittest.TestCase):
             source = inspect_source(path)
             prepared = prepare_source(source,default_settings(),995)
             self.assertIn("0:00:02.00,0:00:03.00",prepared.outputs["sample.ass"])
-            self.assertTrue(prepare_source(source,default_settings(),-1000).error)
+            at_zero = prepare_source(source,default_settings(),-1000)
+            self.assertIn("0:00:00.00,0:00:01.00",at_zero.outputs["sample.ass"])
+            self.assertTrue(prepare_source(source,default_settings(),-2000).error)
+
+    def test_zero_start_is_valid_and_invalid_time_is_not_revived_by_offset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"sample.smi"
+            path.write_text("<SYNC Start=oops><P Class=ENCC>Invalid<SYNC Start=0><P Class=ENCC>Hello<SYNC Start=1000><P Class=ENCC>&nbsp;",encoding="utf-8")
+            prepared = prepare_source(inspect_source(path),default_settings(),500)
+            self.assertIn("0:00:00.50,0:00:01.50",prepared.outputs["sample.ass"])
+            self.assertNotIn("Invalid",prepared.outputs["sample.ass"])
 
     def test_output_conflicts_and_overwrite_authorization(self):
         with tempfile.TemporaryDirectory() as directory:

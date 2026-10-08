@@ -236,13 +236,13 @@ class smi2ass(AssStyle):
                 self.log(f"Failed to extract time code: \n\n{lines}\n")
 
             # Adjust subtitle timecode based on the offset input
-            if self.flag_time_offset:
+            if self.flag_time_offset and time_code >= 0:
                 time_code += self.time_offset
 
             # The key of the dictionary is language code in ass.
             # temporarily hols smi line data in to tmp_lines, and data
             # structure is [smi lines, ass time code, time in ms]
-            if time_code > 0:
+            if time_code >= 0:
                 ass_lang_code: str = self.get_lang_code(lang_tag[0].upper())
                 tmp_lines[ass_lang_code].append(
                     [lines, self.__ms2timestamp(time_code), time_code]
