@@ -1,0 +1,115 @@
+name: Publish prepared release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Prepared release tag to publish (for example V2)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-prepared-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       startsWith(github.event.head_commit.message, 'publish release: V'))
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Verify the tested draft and publish its existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import subprocess
+          import tempfile
+          import tomllib
+
+          def api(path):
+              """Read an authenticated GitHub API response through gh.
+
+              Args:
+                  path (str): Repository API endpoint relative to repos/owner/name.
+
+              Returns:
+                  dict: Decoded JSON response.
+              """
+              return json.loads(subprocess.check_output(
+                  ['gh', 'api', f'repos/{os.environ["GITHUB_REPOSITORY"]}/{path}'], text=True))
+
+          event = json.loads(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          tag = os.environ.get('RELEASE_TAG') or event['head_commit']['message'].splitlines()[0].removeprefix('publish release: ')
+          assert re.fullmatch(r'V[0-9]+(?:\.[0-9]+)*', tag), 'Invalid release tag'
+          metadata = tomllib.loads(pathlib.Path('pyproject.toml').read_text())
+          assert tag == metadata['tool']['smi2ass']['release']['tag'], 'Release tag and project metadata disagree'
+          version = metadata['project']['version']
+          expected = {f'smi2ass{suffix}_{system}_x86-64.{extension}'
+                      for suffix in ('', '-gui') for system in ('linux', 'windows')
+                      for extension in ('zip', '7z')}
+          expected.update({f'smi2ass-{version}-py3-none-any.whl', f'smi2ass-{version}.tar.gz'})
+          release = api(f'releases/tags/{tag}')
+          assert release['tag_name'] == tag and not release['prerelease']
+          assets = {asset['name']: asset for asset in release['assets']}
+          assert len(release['assets']) == len(assets) == 11
+          assert set(assets) == expected | {'SHA256SUMS.txt'}, 'Release assets are incomplete'
+          assert all(asset['state'] == 'uploaded' and asset['size'] > 0 for asset in assets.values())
+
+          # Keep the release on the original tested source commit, even when docs have advanced.
+          target = release['target_commitish']
+          assert re.fullmatch(r'[0-9a-f]{40}', target), 'Release must target an exact commit'
+          comparison = api(f'compare/{target}...{os.environ["GITHUB_SHA"]}')
+          assert comparison['status'] in ('ahead', 'identical'), 'Release source is outside main history'
+          runs = api(f'actions/runs?head_sha={target}&per_page=100')['workflow_runs']
+          assert any(run['path'] == '.github/workflows/ci.yml' and run['head_sha'] == target
+                     and run['head_branch'] == 'main' and run['event'] == 'push'
+                     and run['status'] == 'completed' and run['conclusion'] == 'success'
+                     for run in runs), 'Release source has no successful main CI run'
+
+          # Match every published asset to the manifest using GitHub's uploaded SHA-256 digests.
+          with tempfile.TemporaryDirectory() as directory:
+              subprocess.run(['gh', 'release', 'download', tag, '--repo', os.environ['GITHUB_REPOSITORY'],
+                              '--pattern', 'SHA256SUMS.txt', '--dir', directory], check=True)
+              manifest = pathlib.Path(directory, 'SHA256SUMS.txt').read_bytes()
+          assert assets['SHA256SUMS.txt']['digest'] == 'sha256:' + hashlib.sha256(manifest).hexdigest()
+          entries = [line.split('  ', 1) for line in manifest.decode('utf-8').splitlines()]
+          assert len(entries) == len(expected) and all(len(entry) == 2 for entry in entries)
+          checksums = {name: digest for digest, name in entries}
+          assert set(checksums) == expected, 'Checksum coverage is incomplete'
+          assert all(re.fullmatch(r'[0-9a-f]{64}', digest)
+                     and assets[name]['digest'] == 'sha256:' + digest
+                     for name, digest in checksums.items()), 'Asset checksums disagree'
+
+          # Publishing changes visibility only; no binaries are rebuilt or replaced here.
+          if release['draft']:
+              subprocess.run(['gh', 'release', 'edit', tag, '--repo', os.environ['GITHUB_REPOSITORY'],
+                              '--draft=false', '--latest'], check=True)
+          published = api(f'releases/{release["id"]}')
+          assert not published['draft'] and published['target_commitish'] == target
+          stable_fields = ('id', 'name', 'size', 'digest', 'state')
+          original_assets = [{key: asset[key] for key in stable_fields} for asset in release['assets']]
+          published_assets = [{key: asset[key] for key in stable_fields} for asset in published['assets']]
+          assert published_assets == original_assets, 'Publication changed release assets'
+          print(f'Published {tag}: {published["html_url"]} (11 verified assets)')
+          PY

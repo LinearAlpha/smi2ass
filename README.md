@@ -25,16 +25,14 @@ Screenshots show the running desktop interface with sample subtitle files. The p
 
 ## Download or install
 
-**V2 (package version 2.0) is being prepared for release**, with separate GUI and CLI downloads. See [V2 release notes](RELEASE_NOTES.md) for its features, planned assets, and verification commands. Until V2 is published, the current stable download below provides the CLI.
-
-[Download V1.5.1](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5.1) for **Windows x86-64** or **Linux x86-64**. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. V1.5.1 Linux binaries are built and tested on Ubuntu 26.04.
+[Download V2](https://github.com/LinearAlpha/smi2ass/releases/tag/V2) (package version **2.0**) for **Windows x86-64** or **Linux x86-64**. Choose an archive with `-gui` in its name for the desktop interface, or one without it for the CLI. Extract the entire ZIP or 7z archive and keep the editable `setting` directory beside the executable. Standalone executables do not require Python. V2 Linux binaries are built and tested on Ubuntu 26.04. See [V2 release notes](RELEASE_NOTES.md) for the full changes.
 
 The release includes `SHA256SUMS.txt` for verifying downloads. Each executable archive includes `BUILD-INFO.json` identifying the source commit and build dependencies.
 
 For a Python installation, use **Python 3.11 or later** and install the wheel attached to the release:
 
 ```shell
-python -m pip install smi2ass-1.5.1-py3-none-any.whl
+python -m pip install smi2ass-2.0-py3-none-any.whl
 ```
 
 Or install from a checkout:
@@ -45,13 +43,17 @@ python -m pip install .
 
 Both installations provide the `smi2ass` command and `python -m smi2ass`. Runtime dependencies (`beautifulsoup4`, `charset-normalizer`, and `webcolors`) are installed automatically. The packages are distributed through GitHub Releases; these commands do not assume a PyPI release.
 
-### V1.5.1 assets and SHA-256 verification
+### V2 assets and SHA-256 verification
 
-The [V1.5.1 release](https://github.com/LinearAlpha/smi2ass/releases/tag/V1.5.1) has seven assets:
+The [V2 release](https://github.com/LinearAlpha/smi2ass/releases/tag/V2) has eleven assets:
 
-- `SHA256SUMS.txt` (checksums for the six distributions below)
-- `smi2ass-1.5.1-py3-none-any.whl`
-- `smi2ass-1.5.1.tar.gz`
+- `SHA256SUMS.txt` (checksums for the ten distributions below)
+- `smi2ass-2.0-py3-none-any.whl`
+- `smi2ass-2.0.tar.gz`
+- `smi2ass-gui_linux_x86-64.7z`
+- `smi2ass-gui_linux_x86-64.zip`
+- `smi2ass-gui_windows_x86-64.7z`
+- `smi2ass-gui_windows_x86-64.zip`
 - `smi2ass_linux_x86-64.7z`
 - `smi2ass_linux_x86-64.zip`
 - `smi2ass_windows_x86-64.7z`
@@ -82,7 +84,7 @@ awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | sha256sum -c -
 **macOS:**
 
 ```sh
-file='smi2ass-1.5.1-py3-none-any.whl'
+file='smi2ass-2.0-py3-none-any.whl'
 awk -v file="$file" '$2 == file { print }' SHA256SUMS.txt | shasum -a 256 -c -
 ```
 
@@ -170,7 +172,7 @@ sudo apt-get install -y libegl1 libgl1 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 
 
 Existing output files require confirmation before replacement. Sources that would produce the same output filename are marked as errors; convert them to different folders. Timing offsets can discard cues shifted before the start of the video, following the existing converter behavior.
 
-V2 provides separate CLI and GUI archives; the published V1.5.1 assets contain only the CLI. GUI binaries use `smi2ass-gui` (`smi2ass-gui.exe` on Windows). The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives target Windows/Linux x86-64.
+V2 provides separate CLI and GUI archives. GUI binaries use `smi2ass-gui` (`smi2ass-gui.exe` on Windows). The Windows GUI opens without a console window. Python GUI installations also work on macOS; executable archives target Windows/Linux x86-64.
 
 After downloading the V2 wheel, install its optional GUI extra with:
 
@@ -257,7 +259,9 @@ Wheel/source distributions are written to `dist`; executables are written to `bu
 
 Each archive contains its corresponding executable, editable settings, documentation, and `BUILD-INFO.json`. Nuitka requires a native C compiler (GCC on Linux or a supported Windows compiler); Linux additionally uses `patchelf`. `scripts/build_executable.py` uses the active Python environment and is the authoritative standalone/one-file build configuration.
 
-To prepare a release, update the project/CLI versions together, the `tool.smi2ass.release.tag` in `pyproject.toml`, and both release documents. A commit titled `prepare release: V2` on `main` builds and verifies the artifacts, then creates a **draft** with the wheel/source distributions, eight CLI/GUI archives, and SHA-256 checksums (11 assets total). Publish that prepared draft from GitHub Releases when ready.
+To prepare a release, update the project/CLI versions together, the `tool.smi2ass.release.tag` in `pyproject.toml`, and both release documents. A commit titled `prepare release: V2` on `main` builds and verifies the artifacts, then creates a **draft** with the wheel/source distributions, eight CLI/GUI archives, and SHA-256 checksums (11 assets total).
+
+To publish that prepared draft, use a commit titled `publish release: V2` on `main`, run **Publish prepared release** manually on `main` with the matching tag, or publish it from GitHub Releases. The publication workflow checks the original source commit's successful CI run and all eleven asset names and SHA-256 digests, then publishes the existing draft as the latest release. It preserves the tested source commit and uploaded files.
 
 For a new release that should publish automatically after verification, use a commit titled `release: V<version>` or run CI manually on `main` with `publish` enabled. All test, package, GUI, and executable jobs must succeed first. Ordinary commits and PRs only validate artifacts. An existing release is never overwritten.
 
