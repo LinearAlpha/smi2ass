@@ -18,9 +18,11 @@ CLI_EXCLUSIONS = (
 def build_target(target):
     output = ROOT / "build" / target
     output.mkdir(parents=True, exist_ok=True)
+    jobs = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    print(f"Compiling {target.upper()} with {jobs} parallel jobs.", flush=True)
     command = [
         sys.executable, "-m", "nuitka", "--standalone", "--onefile",
-        "--assume-yes-for-downloads", "--remove-output", "--jobs=2",
+        "--assume-yes-for-downloads", "--remove-output", f"--jobs={jobs}",
         "--include-package=smi2ass", "--include-package-data=smi2ass",
         "--nofollow-import-to=smi2ass.test",
         f"--output-dir={output}", f"--output-filename={executable_name(target)}",

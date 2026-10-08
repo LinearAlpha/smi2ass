@@ -191,6 +191,8 @@ For a complete local build, install **Python 3.14 x86-64** and a native C compil
 
 The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the selected executables for your OS. Qt is installed only when the GUI is selected. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
 
+CLI and GUI compilation automatically use one parallel compiler job per available logical CPU, respecting the process's CPU affinity. The selected job count is printed at the start of each compilation. No extra build flag is needed.
+
 To clean generated files before building, add `-Clean` (Windows) or `--clean` (Linux). To clean without building, use `-CleanOnly` or `--clean-only`:
 
 ```powershell

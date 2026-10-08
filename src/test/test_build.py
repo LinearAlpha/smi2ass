@@ -29,11 +29,14 @@ class BuildTargetTest(unittest.TestCase):
             (root / "src" / "setting").mkdir(parents=True)
             (root / "src" / "setting" / "ass_styles.json").write_text("{}")
             with patch.object(build_executable, "ROOT", root), \
+                 patch.object(build_executable.os, "process_cpu_count", return_value=8, create=True), \
                  patch.object(build_executable.subprocess, "run") as compile_run, \
                  patch.object(build_executable, "smoke_test") as smoke:
                 build_executable.build_target("cli")
                 build_executable.build_target("gui")
             cli, gui = [call.args[0] for call in compile_run.call_args_list]
+            self.assertIn("--jobs=8", cli)
+            self.assertIn("--jobs=8", gui)
             self.assertIn("--output-filename=" + build_common.executable_name("cli"), cli)
             self.assertIn("--output-filename=" + build_common.executable_name("gui"), gui)
             self.assertTrue(any("PySide6" in option for option in cli))
