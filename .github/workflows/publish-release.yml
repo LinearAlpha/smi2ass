@@ -54,7 +54,7 @@ jobs:
                   path (str): Repository API endpoint relative to repos/owner/name.
 
               Returns:
-                  dict: Decoded JSON response.
+                  dict | list: Decoded JSON response.
               """
               return json.loads(subprocess.check_output(
                   ['gh', 'api', f'repos/{os.environ["GITHUB_REPOSITORY"]}/{path}'], text=True))
@@ -69,7 +69,10 @@ jobs:
                       for suffix in ('', '-gui') for system in ('linux', 'windows')
                       for extension in ('zip', '7z')}
           expected.update({f'smi2ass-{version}-py3-none-any.whl', f'smi2ass-{version}.tar.gz'})
-          release = api(f'releases/tags/{tag}')
+          # The by-tag REST endpoint excludes drafts; the authenticated list includes them.
+          matches = [release for release in api('releases?per_page=100') if release['tag_name'] == tag]
+          assert len(matches) == 1, 'Prepared release was not found'
+          release = matches[0]
           assert release['tag_name'] == tag and not release['prerelease']
           assets = {asset['name']: asset for asset in release['assets']}
           assert len(release['assets']) == len(assets) == 11
