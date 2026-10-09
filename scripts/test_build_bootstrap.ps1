@@ -104,3 +104,6 @@ pathlib.Path('bootstrap.json').write_text(json.dumps({'version': list(sys.versio
     $env:PYTHONPATH = $OriginalPythonPath
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -LiteralPath $Fixture -Recurse -Force }
 }
+
+# Expected rejection probes leave a nonzero native exit code; all assertions passed here.
+exit 0
