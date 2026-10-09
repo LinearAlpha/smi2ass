@@ -15,6 +15,28 @@ permissions:
   contents: read
 
 jobs:
+  windows-bootstrap:
+    name: Windows Python detection / ${{ matrix.shell }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        id: unsupported
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-python@v6
+        id: supported
+        with:
+          python-version: "3.14"
+      - name: Check interpreter selection with an older virtual environment active
+        shell: ${{ matrix.shell }}
+        run: |
+          .\scripts\test_build_bootstrap.ps1 -SupportedPython '${{ steps.supported.outputs.python-path }}' -UnsupportedPython '${{ steps.unsupported.outputs.python-path }}'
+
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -129,7 +151,7 @@ jobs:
 
   release:
     name: Prepare or publish tested release
-    needs: [test, package, gui, executable]
+    needs: [windows-bootstrap, test, package, gui, executable]
     # Preparation commits create a draft; release commits explicitly publish it.
     # Normal pushes and pull requests only build/test.
     if: >-
