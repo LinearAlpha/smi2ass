@@ -221,6 +221,14 @@ For a complete local build, install **Python 3.14 x86-64** and a native C compil
 .\build.ps1 -Target gui # Build only the GUI
 ```
 
+On Windows, the script searches all matching Python executables on PATH, so an activated older `.venv` can remain active while an installed Python 3.14 is selected for the build. A valid existing `.build-venv` is also considered. To select an interpreter explicitly, use its full executable path:
+
+```powershell
+.\build.ps1 -Target all -Python 'C:\Program Files\Python314\python.exe'
+```
+
+Replace that path with your Python 3.14 x86-64 installation. If detection fails, the error lists the checked executables and their versions/architectures or launch errors. Run `python --version` and `py -3.14 --version` to check the active interpreter and launcher separately.
+
 The scripts create or reuse `.build-venv`, install build/runtime dependencies, build and check the wheel/source distributions, and compile, archive, and smoke-test the selected executables for your OS. Qt is installed only when the GUI is selected. No virtual-environment activation is needed. Each script stops on a failed step. Old `smi2ass` wheel/source files in `dist` are replaced so repeated builds verify only the current pair.
 
 CLI and GUI compilation automatically use one parallel compiler job per available logical CPU, respecting the process's CPU affinity. The selected job count is printed at the start of each compilation. No extra build flag is needed.
