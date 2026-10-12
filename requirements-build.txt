@@ -1,8 +1,8 @@
 build
 twine
-nuitka
+# Upgrade the compiler only after native CLI/GUI smoke tests pass on both platforms.
+nuitka==4.2.2
 ordered-set
 zstandard
 patchelf; sys_platform == 'linux'
 py7zr
-
