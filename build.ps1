@@ -89,6 +89,18 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw 'The existing .build-venv is not a Python 3.14 x86-64 environment. Rename or remove it and rerun build.ps1.'
         }
+        if ($Python) {
+            # Different venvs from the same installation may be reused, but an explicit
+            # interpreter must not silently build with another installation or patch.
+            $IdentityCheck = "import json, os, sys; print(json.dumps([os.path.normcase(os.path.realpath(sys.base_prefix)), sys.version]))"
+            $RequestedIdentity = & $BootstrapPython @BootstrapArgs -I -c $IdentityCheck
+            if ($LASTEXITCODE -ne 0) { throw 'Could not identify the installation selected by -Python.' }
+            $ExistingIdentity = & $script:BuildPython -I -c $IdentityCheck
+            if ($LASTEXITCODE -ne 0) { throw 'Could not identify the existing .build-venv installation for -Python.' }
+            if ($RequestedIdentity -cne $ExistingIdentity) {
+                throw 'The existing .build-venv uses a different Python installation or version than -Python. Rename .build-venv and rerun with -Python to create a new build environment, or omit -Python to reuse the existing one.'
+            }
+        }
     } else {
         & $BootstrapPython @BootstrapArgs -I -m venv .build-venv
         if ($LASTEXITCODE -ne 0) {

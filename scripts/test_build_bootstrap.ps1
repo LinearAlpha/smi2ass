@@ -27,10 +27,13 @@ function Test-Bootstrap {
     Optional explicit interpreter passed to the build script.
     .PARAMETER FailurePattern
     Expected rejection text; rejected cases must never reach cleanup.
+    .PARAMETER BuildProbe
+    Reach the first build command using a local pip stub that records its interpreter.
     #>
-    param([string]$Name, [string]$ExpectedPython, [string]$Python, [string]$FailurePattern)
+    param([string]$Name, [string]$ExpectedPython, [string]$Python, [string]$FailurePattern, [switch]$BuildProbe)
     if (Test-Path -LiteralPath $Marker) { Remove-Item -LiteralPath $Marker }
     $options = @{ CleanOnly = $true }
+    if ($BuildProbe) { $options = @{} }
     if ($Python) { $options.Python = $Python }
     $failure = $null
     $location = (Get-Location).Path
@@ -45,7 +48,11 @@ function Test-Bootstrap {
         }
         if (Test-Path -LiteralPath $Marker) { throw "$Name unexpectedly reached cleanup." }
     } else {
-        if ($failure) { throw "$Name failed: $failure" }
+        if ($BuildProbe) {
+            if (!$failure -or $failure -notmatch 'Build step failed \(exit code 73\)') {
+                throw "$Name did not reach the isolated pip stub: $failure"
+            }
+        } elseif ($failure) { throw "$Name failed: $failure" }
         $result = Get-Content -LiteralPath $Marker -Raw | ConvertFrom-Json
         if ($result.version[0] -ne 3 -or $result.version[1] -ne 14 -or $result.executable -ne $ExpectedPython) {
             throw "$Name selected the wrong interpreter: $($result.executable)"
@@ -97,6 +104,20 @@ pathlib.Path('bootstrap.json').write_text(json.dumps({'version': list(sys.versio
     Test-Bootstrap -Name 'Existing Python 3.14 build environment is reusable' -ExpectedPython (Join-Path $Fixture '.build-venv\Scripts\python.exe')
     Test-Bootstrap -Name 'Explicit unsupported interpreter is rejected' -Python (Join-Path $OlderScripts 'python.exe') -FailurePattern 'Python 3\.13'
     Test-Bootstrap -Name 'Missing explicit executable is reported' -Python (Join-Path $Fixture 'missing.exe') -FailurePattern 'executable not found'
+
+    # Stop at the first dependency command while recording the actual build interpreter.
+    # This fixture never installs packages or invokes the compiler.
+    $PipStub = Join-Path $Fixture '.build-venv\Lib\site-packages\pip'
+    New-Item -ItemType Directory -Path $PipStub -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $PipStub '__init__.py') -Value '' -Encoding ASCII
+    $StubCode = Get-Content -LiteralPath (Join-Path $Fixture 'scripts\clean_project.py') -Raw
+    ($StubCode + "`nsys.exit(73)`n") | Set-Content -LiteralPath (Join-Path $PipStub '__main__.py') -Encoding ASCII
+    Test-Bootstrap -Name 'Explicit matching installation reuses the build interpreter' -Python $SupportedExecutable -BuildProbe -ExpectedPython (Join-Path $Fixture '.build-venv\Scripts\python.exe')
+
+    # A copied real installation has the same version but a distinct base directory.
+    $AlternateInstallation = Join-Path $Fixture 'Alternate Python 314'
+    Copy-Item -LiteralPath (Split-Path $SupportedPython -Parent) -Destination $AlternateInstallation -Recurse
+    Test-Bootstrap -Name 'Explicit different installation cannot reuse the build environment' -Python (Join-Path $AlternateInstallation 'python.exe') -BuildProbe -FailurePattern 'different Python installation'
 } finally {
     $env:PATH = $OriginalPath
     $env:VIRTUAL_ENV = $OriginalVirtualEnv
