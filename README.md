@@ -267,6 +267,8 @@ Wheel/source distributions are written to `dist`; executables are written to `bu
 | CLI | `smi2ass_linux_x86-64.zip` / `.7z` | `smi2ass_windows_x86-64.zip` / `.7z` |
 | GUI | `smi2ass-gui_linux_x86-64.zip` / `.7z` | `smi2ass-gui_windows_x86-64.zip` / `.7z` |
 
+The build scripts upgrade Nuitka to the latest stable version available for Python 3.14 on each build, including when reusing `.build-venv`. CI runs the same scripts and verifies the compiled CLI and GUI on Windows and Linux.
+
 Each archive contains its corresponding executable, editable settings, documentation, and `BUILD-INFO.json`. Nuitka requires a native C compiler (GCC on Linux or a supported Windows compiler); Linux additionally uses `patchelf`. `scripts/build_executable.py` uses the active Python environment and is the authoritative standalone/one-file build configuration.
 
 To prepare a release, update the project/CLI versions together, the `tool.smi2ass.release.tag` in `pyproject.toml`, and both release documents. A commit titled `prepare release: V2` on `main` builds and verifies the artifacts, then creates a **draft** with the wheel/source distributions, eight CLI/GUI archives, and SHA-256 checksums (11 assets total).

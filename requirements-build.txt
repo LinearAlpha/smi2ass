@@ -1,7 +1,6 @@
 build
 twine
-# Upgrade the compiler only after native CLI/GUI smoke tests pass on both platforms.
-nuitka==4.2.2
+nuitka
 ordered-set
 zstandard
 patchelf; sys_platform == 'linux'
