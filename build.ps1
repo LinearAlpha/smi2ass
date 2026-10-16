@@ -110,7 +110,7 @@ try {
 
     Invoke-BuildPython -I -m pip --isolated install -r requirements-build.txt
     # Refresh the compiler even when reusing an existing build environment.
-    Invoke-BuildPython -I -m pip --isolated install --upgrade nuitka
+    Invoke-BuildPython -I scripts/install_nuitka.py
     $Project = if ($Target -eq 'cli') { '.' } else { '.[gui]' }
     Invoke-BuildPython -I -m pip --isolated install --force-reinstall $Project
     Invoke-BuildPython -I -m pip --isolated check

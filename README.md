@@ -267,7 +267,7 @@ Wheel/source distributions are written to `dist`; executables are written to `bu
 | CLI | `smi2ass_linux_x86-64.zip` / `.7z` | `smi2ass_windows_x86-64.zip` / `.7z` |
 | GUI | `smi2ass-gui_linux_x86-64.zip` / `.7z` | `smi2ass-gui_windows_x86-64.zip` / `.7z` |
 
-The build scripts upgrade Nuitka to the latest stable version available for Python 3.14 on each build, including when reusing `.build-venv`. CI runs the same scripts and verifies the compiled CLI and GUI on Windows and Linux.
+The build scripts upgrade Nuitka to the latest stable version available for Python 3.14 on each build, including when reusing `.build-venv`. CI runs the same scripts and verifies the compiled CLI and GUI on Windows and Linux. If the package index still supplies Nuitka 4.3, the scripts install the official 4.3.1 hotfix from [its upstream commit](https://github.com/Nuitka/Nuitka/commit/8ba9ccdf78268aba8bb21b79ed72fc9a4d44887d) to address its PySide6 startup crash. This fallback applies only to 4.3; newer releases continue to upgrade normally.
 
 Each archive contains its corresponding executable, editable settings, documentation, and `BUILD-INFO.json`. Nuitka requires a native C compiler (GCC on Linux or a supported Windows compiler); Linux additionally uses `patchelf`. `scripts/build_executable.py` uses the active Python environment and is the authoritative standalone/one-file build configuration.
 

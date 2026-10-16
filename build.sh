@@ -69,7 +69,7 @@ fi
 
 "$build_python" -I -m pip --isolated install -r requirements-build.txt
 # Refresh the compiler even when reusing an existing build environment.
-"$build_python" -I -m pip --isolated install --upgrade nuitka
+"$build_python" -I scripts/install_nuitka.py
 project='.'
 if [[ "$target" != cli ]]; then
     project='.[gui]'
